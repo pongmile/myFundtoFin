@@ -37,23 +37,29 @@ export async function GET(request: NextRequest) {
 
       if (!response.ok) throw new Error('Failed to fetch fund page');
 
-      const html = await response.text();
-      const $ = cheerio.load(html);
+    const html = await response.text();
+    const $ = cheerio.load(html);
 
-      // Try multiple selectors for SCBAM
-      const selectors = [
-        '#tab-fillup1 > div > div:nth-child(2) > div:nth-child(2) > div:nth-child(2) > h2',
-        '#tab-fillup1 > div > div:nth-child(2) > div:nth-child(2) > div:nth-child(4) > h2',
-        '.price-value',
-        'h2:contains("ราคา")',
-      ];
+    // Try multiple selectors for SCBAM based on XPath logic
+    // Convert XPath to CSS selector approximation
+    const selectors = [
+      'div:nth-of-type(3) > div > div:nth-of-type(1) > section:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div > div:nth-of-type(3) > div:nth-of-type(2) > h4',
+      '#tab-fillup1 > div > div:nth-child(2) > div:nth-child(2) > div:nth-child(4) > h2',
+    ];
 
-      for (const selector of selectors) {
+    for (const selector of selectors) {
+      try {
         const text = $(selector).text().trim();
+        // Skip if value is "-" or empty
+        if (text && text !== '-') {
         const parsed = parseFloat(text.replace(/,/g, ''));
         if (!isNaN(parsed) && parsed > 0) {
           price = parsed;
-          break;
+              break;
+            }
+          }
+        } catch (err) {
+          console.error(`Error parsing selector ${selector}:`, err);
         }
       }
     } else if (source === 'fundsupermart' && url) {
