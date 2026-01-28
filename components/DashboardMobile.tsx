@@ -91,10 +91,24 @@ export default function DashboardMobile() {
       let cryptoTotal = 0;
       for (const item of cryptoItems) {
         try {
-          const response = await axios.get(`/api/crypto/price?symbol=${item.symbol}`);
-          const currentPrice = response.data.price || 0;
+          // Use Bitkub API for KUB, BTC, BNB, ETH
+          const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH'].includes(item.symbol.toUpperCase());
+          const apiUrl = useBitkub 
+            ? `/api/crypto/bitkub?symbol=${item.symbol}`
+            : `/api/crypto/price?symbol=${item.symbol}`;
+          
+          const response = await axios.get(apiUrl);
           const quantity = parseFloat(item.quantity || 0);
-          cryptoTotal += currentPrice * quantity;
+          
+          if (useBitkub && response.data.priceThb) {
+            // Bitkub returns price in THB directly
+            cryptoTotal += response.data.priceThb * quantity;
+          } else {
+            // CoinGecko returns USD, convert to THB
+            const currentPriceUSD = response.data.price || 0;
+            const thbRate = 31; // USD to THB
+            cryptoTotal += currentPriceUSD * thbRate * quantity;
+          }
         } catch (error) {
           console.warn(`Failed to get price for ${item.symbol}, using cost basis`);
           cryptoTotal += parseFloat(item.cost_basis || 0);
