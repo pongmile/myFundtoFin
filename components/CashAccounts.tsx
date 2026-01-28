@@ -1,0 +1,273 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { getExchangeRate } from '@/lib/cache';
+import { CashAccount } from '@/types';
+import { Plus, Edit2, Trash2, Building2 } from 'lucide-react';
+
+const BANK_LOGOS: Record<string, string> = {
+  'SCB': 'https://www.scb.co.th/content/dam/scb/personal-banking/logos/scb-logo.png',
+  'Kasikorn': 'https://www.kasikornbank.com/SiteCollectionDocuments/about/img/logo/logo.png',
+  'Bangkok Bank': 'https://www.bangkokbank.com/en/-/media/project/bangkokbank/en/images/logo/bbl-logo.png',
+  'Krungsri': 'https://www.krungsri.com/bank/getmedia/5c900e3f-0e3e-4f5c-9f5f-5f5c5e5c5e5c/logo-krungsri.png',
+};
+
+export default function CashAccounts() {
+  const [accounts, setAccounts] = useState<CashAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    bank_name: '',
+    amount: 0,
+    currency: 'THB',
+  });
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('cash_accounts')
+        .select('*')
+        .order('bank_name');
+
+      if (error) throw error;
+      setAccounts(data || []);
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingId) {
+        const { error } = await supabase
+          .from('cash_accounts')
+          .update(formData)
+          .eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('cash_accounts')
+          .insert([formData]);
+        if (error) throw error;
+      }
+
+      setShowForm(false);
+      setEditingId(null);
+      setFormData({ bank_name: '', amount: 0, currency: 'THB' });
+      loadAccounts();
+    } catch (error) {
+      console.error('Error saving account:', error);
+      alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
+    }
+  };
+
+  const handleEdit = (account: CashAccount) => {
+    setEditingId(account.id);
+    setFormData({
+      bank_name: account.bank_name,
+      amount: account.amount,
+      currency: account.currency,
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('คุณต้องการลบบัญชีนี้หรือไม่?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('cash_accounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      loadAccounts();
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert('เกิดข้อผิดพลาด');
+    }
+  };
+
+  const formatCurrency = (value: number, currency: string) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: currency === 'THB' ? 'THB' : currency,
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    }).format(value);
+  };
+
+  const getTotalInTHB = async () => {
+    let total = 0;
+    for (const account of accounts) {
+      let amount = account.amount;
+      if (account.currency !== 'THB') {
+        const rate = await getExchangeRate(account.currency, 'THB');
+        amount *= rate;
+      }
+      total += amount;
+    }
+    return total;
+  };
+
+  const [totalTHB, setTotalTHB] = useState(0);
+
+  useEffect(() => {
+    getTotalInTHB().then(setTotalTHB);
+  }, [accounts]);
+
+  if (loading) {
+    return <div className="text-center py-12">กำลังโหลด...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">เงินสด</h1>
+          <p className="text-xl text-gray-600 mt-2">
+            รวม: {formatCurrency(totalTHB, 'THB')}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditingId(null);
+            setFormData({ bank_name: '', amount: 0, currency: 'THB' });
+            setShowForm(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          <Plus size={18} />
+          เพิ่มบัญชี
+        </button>
+      </div>
+
+      {/* Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editingId ? 'แก้ไขบัญชี' : 'เพิ่มบัญชีใหม่'}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ชื่อธนาคาร
+                </label>
+                <input
+                  type="text"
+                  value={formData.bank_name}
+                  onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  จำนวนเงิน
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  สกุลเงิน
+                </label>
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="THB">THB (บาท)</option>
+                  <option value="USD">USD (ดอลลาร์)</option>
+                  <option value="CAD">CAD (ดอลลาร์แคนาดา)</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingId(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Accounts Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {accounts.map((account) => (
+          <div
+            key={account.id}
+            className="bg-white rounded-xl p-6 shadow-lg border hover:shadow-xl transition-shadow"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Building2 className="text-blue-600" size={24} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{account.bank_name}</h3>
+                  <p className="text-xs text-gray-500">{account.currency}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEdit(account)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() => handleDelete(account.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">
+                {formatCurrency(account.amount, account.currency)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {accounts.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          ยังไม่มีบัญชีธนาคาร คลิกปุ่ม "เพิ่มบัญชี" เพื่อเริ่มต้น
+        </div>
+      )}
+    </div>
+  );
+}
