@@ -45,10 +45,12 @@ export interface CryptoData {
 
 export interface CashAccount {
   id: string;
+  account_name?: string;
   bank_name: string;
   bank_logo?: string;
   amount: number;
   currency: string;
+  created_at?: string;
 }
 
 export interface Liability {
