@@ -82,7 +82,7 @@ export async function getExchangeRate(
 
     // Fallback: rough estimate
     const fallbackRates: Record<string, number> = {
-      'USDTHB': 35.5,
+      'USDTHB': 31.2,
       'CADTHB': 26.0,
       'THBUSD': 0.028,
       'THBCAD': 0.038,

@@ -21,9 +21,10 @@ CREATE TABLE IF NOT EXISTS stocks (
   quantity DECIMAL(15, 4) NOT NULL DEFAULT 0,
   cost_basis DECIMAL(15, 4) NOT NULL DEFAULT 0, -- Total cost in THB or USD
   currency TEXT NOT NULL DEFAULT 'THB',
-  data_source TEXT, -- 'yahoo', 'scbam', 'fundsupermart'
+  data_source TEXT, -- 'yahoo', 'scbam', 'fundsupermart', 'scb_robo', 'guru_portfolio', 'manual'
   data_url TEXT,
   xpath_selector TEXT,
+  manual_price DECIMAL(15, 4), -- For manual price input (AI Port, Robo Advisor, etc.)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );

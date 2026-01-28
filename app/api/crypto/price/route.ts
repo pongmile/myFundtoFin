@@ -12,18 +12,23 @@ export async function GET(request: Request) {
   try {
     // Try CoinGecko API (free, no API key required)
     const coinGeckoId = getCoinGeckoId(symbol);
-    const response = await axios.get(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinGeckoId}&vs_currencies=thb&include_24hr_change=true`,
-      { timeout: 5000 }
-    );
+    const response = await fetch(`https://cryptoprices.cc/${symbol}/`);
+    // const response = await axios.get(
+    //   `https://api.coingecko.com/api/v3/simple/price?ids=${coinGeckoId}&vs_currencies=thb&include_24hr_change=true`,
+    //   { timeout: 5000 }
+    // );
 
-    if (response.data[coinGeckoId]) {
-      return NextResponse.json({
-        symbol,
-        price: response.data[coinGeckoId].thb,
-        change_24h: response.data[coinGeckoId].thb_24h_change || 0,
-        source: 'coingecko',
-      });
+    if (response.ok) {
+      const priceUSD = parseFloat(await response.text());
+      if (!isNaN(priceUSD)) {
+        return NextResponse.json({
+          symbol,
+          price: priceUSD,
+          source: 'cryptoprices',
+        });
+      }
+      
+      
     }
 
     // Fallback: return 0 if not found

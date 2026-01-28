@@ -1,8 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Stack,
+  Chip,
+  CircularProgress,
+  IconButton,
+  Alert,
+  Avatar,
+  LinearProgress,
+} from '@mui/material';
+import {
+  Refresh,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  AccountBalanceWallet,
+  ShowChart,
+  CurrencyBitcoin,
+  Warning,
+} from '@mui/icons-material';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Wallet, Bitcoin, Eye, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getExchangeRate } from '@/lib/cache';
 import axios from 'axios';
@@ -25,6 +46,8 @@ interface WealthChange {
   monthly: number;
   monthlyPercent: number;
 }
+
+const COLORS = ['#10B981', '#8B5CF6', '#F59E0B'];
 
 export default function DashboardMobile() {
   const [summary, setSummary] = useState<PortfolioSummary>({
@@ -68,7 +91,6 @@ export default function DashboardMobile() {
         supabase.from('wealth_history').select('*').order('date', { ascending: false }).limit(30).then(r => r.error ? { data: [], error: r.error } : r),
       ]);
 
-      // Check for table errors
       if (cashData.error?.message?.includes('relation') || cashData.error?.message?.includes('does not exist')) {
         setDbError('กรุณารัน SQL schema ใน Supabase ก่อน');
         setLoading(false);
@@ -86,13 +108,11 @@ export default function DashboardMobile() {
         cashTotal += amount;
       }
 
-      // Calculate crypto with real-time prices
       const cryptoItems = cryptoData.data || [];
       let cryptoTotal = 0;
       for (const item of cryptoItems) {
         try {
-          // Use Bitkub API for KUB, BTC, BNB, ETH
-          const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH'].includes(item.symbol.toUpperCase());
+          const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH', 'USDT'].includes(item.symbol.toUpperCase());
           const apiUrl = useBitkub 
             ? `/api/crypto/bitkub?symbol=${item.symbol}`
             : `/api/crypto/price?symbol=${item.symbol}`;
@@ -101,12 +121,10 @@ export default function DashboardMobile() {
           const quantity = parseFloat(item.quantity || 0);
           
           if (useBitkub && response.data.priceThb) {
-            // Bitkub returns price in THB directly
             cryptoTotal += response.data.priceThb * quantity;
           } else {
-            // CoinGecko returns USD, convert to THB
             const currentPriceUSD = response.data.price || 0;
-            const thbRate = 31; // USD to THB
+            const thbRate = 31;
             cryptoTotal += currentPriceUSD * thbRate * quantity;
           }
         } catch (error) {
@@ -122,7 +140,6 @@ export default function DashboardMobile() {
           const quantity = parseFloat(item.quantity || 0);
           let price = 0;
           
-          // Fetch real-time price based on data source
           if (item.data_source === 'yahoo') {
             const res = await axios.get(`/api/prices/stock?symbol=${item.symbol}`);
             price = res.data.price || 0;
@@ -135,7 +152,6 @@ export default function DashboardMobile() {
           
           let value = price * quantity;
           
-          // Convert to THB if needed
           if (item.currency && item.currency !== 'THB') {
             const rate = await getExchangeRate(item.currency, 'THB');
             value *= rate;
@@ -174,7 +190,6 @@ export default function DashboardMobile() {
         cryptoCount: cryptoItems.length,
       });
 
-      // Calculate real changes from wealth_history
       const historyItems = historyData.data || [];
       if (historyItems.length > 0) {
         const today = netWealth;
@@ -208,126 +223,82 @@ export default function DashboardMobile() {
   }, []);
 
   const pieData = [
-    { name: 'เงินสด', value: summary.cash, color: '#10B981' },
-    { name: 'หุ้น/กองทุน', value: summary.stocks, color: '#8B5CF6' },
-    { name: 'Crypto', value: summary.crypto, color: '#F59E0B' },
+    { name: 'เงินสด', value: summary.cash, color: COLORS[0] },
+    { name: 'หุ้น/กองทุน', value: summary.stocks, color: COLORS[1] },
+    { name: 'Crypto', value: summary.crypto, color: COLORS[2] },
   ].filter(item => item.value > 0);
 
   const formatCurrency = (value: number) => {
-    if (isNaN(value) || value === 0) return '฿0.00';
-    return new Intl.NumberFormat('th-TH', {
-      style: 'currency',
-      currency: 'THB',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
+    return `฿${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   if (configError) {
     return (
-      <div className="p-4">
-        <div className="glass-card p-6 border-yellow-500/30">
-          <div className="text-center">
-            <div className="text-yellow-400 text-4xl mb-4">⚠️</div>
-            <h3 className="text-xl font-bold text-yellow-400 mb-2">ต้องตั้งค่า Supabase</h3>
-            <p className="text-gray-300 text-sm">กรุณาตั้งค่า .env.local ก่อนใช้งาน</p>
-          </div>
-        </div>
-      </div>
+      <Alert severity="error" icon={<Warning />}>
+        <Typography variant="h6">Configuration Error</Typography>
+        <Typography variant="body2">Please configure Supabase credentials in .env.local</Typography>
+      </Alert>
     );
   }
 
   if (dbError) {
     return (
-      <div className="p-4">
-        <div className="glass-card p-6 border-red-500/30">
-          <div className="text-center">
-            <AlertCircle size={48} className="text-red-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-red-400 mb-2">ฐานข้อมูลยังไม่พร้อม</h3>
-            <p className="text-gray-300 text-sm mb-4">{dbError}</p>
-            <p className="text-gray-400 text-xs">รัน supabase-schema.sql ใน SQL Editor ของ Supabase</p>
-          </div>
-        </div>
-      </div>
+      <Alert severity="error" icon={<Warning />}>
+        <Typography variant="h6">{dbError}</Typography>
+      </Alert>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <RefreshCw className="animate-spin text-purple-400" size={48} />
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress size={60} />
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-6 pb-8 px-4 max-w-2xl mx-auto">
-      {/* Mobile-First Header */}
-      <div className="text-center pt-6">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <p className="text-gray-300 text-base font-medium">💰 สินทรัพย์ของฉัน</p>
-        </div>
-        <h1 className="text-5xl md:text-6xl font-bold text-white mb-3 tracking-tight">
+    <Stack spacing={3}>
+      {/* Header */}
+      <Box textAlign="center">
+        <Typography variant="body1" color="text.secondary" mb={2}>
+          💰 สินทรัพย์ของฉัน
+        </Typography>
+        <Typography variant="h2" fontWeight="bold" mb={1}>
           {formatCurrency(summary.netWealth)}
-        </h1>
-        <p className="text-gray-400 text-sm mb-4">
-          📅 มูลค่าสินทรัพย์ทั้งหมด ({new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })})
-        </p>
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          📅 {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </Typography>
         {summary.netWealth > 0 && (
-        <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-full shadow-lg ${
-          change.dailyPercent >= 0 ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'
-        }`}>
-          {change.dailyPercent >= 0 ? (
-            <TrendingUp size={16} className="text-green-400" />
-          ) : (
-            <TrendingDown size={16} className="text-red-400" />
-          )}
-          <span className={`text-lg font-bold ${change.dailyPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {change.dailyPercent >= 0 ? '+' : ''}{change.dailyPercent.toFixed(2)}%
-          </span>
-        </div>
+          <Chip
+            icon={change.dailyPercent >= 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
+            label={`${change.dailyPercent >= 0 ? '+' : ''}${change.dailyPercent.toFixed(2)}%`}
+            color={change.dailyPercent >= 0 ? 'success' : 'error'}
+            sx={{ fontWeight: 'bold' }}
+          />
         )}
-      </div>
+      </Box>
 
-      {/* Tab Pills */}
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-        <button className="px-6 py-3 bg-white text-gray-900 rounded-full text-sm font-bold whitespace-nowrap shadow-lg hover:shadow-xl transition-all">
-          🏠 ทั้งหมด
-        </button>
-        <button className="px-6 py-3 bg-gray-800/60 text-gray-300 rounded-full text-sm font-semibold whitespace-nowrap border border-gray-600 hover:bg-gray-700/60 transition-all">
-          💵 เงินสด
-        </button>
-        <button className="px-6 py-3 bg-gray-800/60 text-gray-300 rounded-full text-sm font-semibold whitespace-nowrap border border-gray-600 hover:bg-gray-700/60 transition-all">
-          📊 กองทุน
-        </button>
-        <button className="px-6 py-3 bg-gray-800/60 text-gray-300 rounded-full text-sm font-semibold whitespace-nowrap border border-gray-600 hover:bg-gray-700/60 transition-all">
-          📈 หุ้น
-        </button>
-      </div>
+      {/* Chart Card */}
+      <Card>
+        <CardContent>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                📊 สัดส่วนการลงทุน
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </Typography>
+            </Box>
+            <IconButton onClick={loadData} size="small">
+              <Refresh />
+            </IconButton>
+          </Stack>
 
-      {/* Main Card with Chart */}
-      <div className="glass-card p-6 shadow-2xl border-purple-500/20">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              📊 สัดส่วนการลงทุน
-            </h3>
-            <p className="text-sm text-gray-400 mt-1">
-              {new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <button 
-            onClick={loadData} 
-            className="p-3 hover:bg-gray-700/50 rounded-xl transition-all group"
-            title="รีเฟรชข้อมูล"
-          >
-            <RefreshCw size={20} className="text-gray-300 group-hover:text-white group-hover:rotate-180 transition-all duration-500" />
-          </button>
-        </div>
-        
-        {summary.totalWealth > 0 ? (
-          <>
-            <div className="relative">
+          {summary.totalWealth > 0 ? (
+            <>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -336,7 +307,6 @@ export default function DashboardMobile() {
                     cy="50%"
                     innerRadius={60}
                     outerRadius={85}
-                    labelLine={false}
                     dataKey="value"
                     strokeWidth={0}
                   >
@@ -346,141 +316,158 @@ export default function DashboardMobile() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className=" inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center">
-                  <p className="text-gray-400 text-xs">Total</p>
-                  <p className="text-white font-bold text-lg">{formatCurrency(summary.totalWealth)}</p>
-                </div>
-              </div>
-            </div>
 
-            {/* Legend */}
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              {pieData.map((item, index) => (
-                <div key={index} className="flex flex-col gap-2 p-4 rounded-xl bg-gray-800/30 hover:bg-gray-700/30 transition-all">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-lg" style={{ backgroundColor: item.color }}></div>
-                    <p className="text-xs text-gray-400 truncate">{item.name}</p>
-                  </div>
-                  <p className="text-lg font-bold text-white">
-                    {summary.totalWealth > 0 ? ((item.value / summary.totalWealth) * 100).toFixed(1) : '0'}%
-                  </p>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📊</div>
-            <p className="text-gray-300 text-lg font-semibold mb-2">ยังไม่มีข้อมูลสินทรัพย์</p>
-            <p className="text-gray-500 text-sm">เพิ่มบัญชีเงินสด หุ้น หรือ Crypto เพื่อเริ่มต้น</p>
-          </div>
-        )}
-      </div>
-
-      {/* Asset List Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          🏦 ประเภทสินทรัพย์
-        </h2>
-        <button className="px-4 py-2 text-sm text-gray-300 border border-gray-600 rounded-xl hover:bg-gray-700/30 transition-all font-medium">
-          📋 จัดเรียง
-        </button>
-      </div>
+              <Stack direction="row" spacing={2} flexWrap="wrap" mt={2}>
+                {pieData.map((item, index) => (
+                  <Box key={index} flex="1 1 30%">
+                    <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
+                      <Box width={12} height={12} borderRadius="50%" bgcolor={item.color} />
+                      <Typography variant="caption" color="text.secondary">
+                        {item.name}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="h6" fontWeight="bold">
+                      {summary.totalWealth > 0 ? ((item.value / summary.totalWealth) * 100).toFixed(1) : '0'}%
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          ) : (
+            <Box textAlign="center" py={8}>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                ยังไม่มีข้อมูลสินทรัพย์
+              </Typography>
+              <Typography variant="body2" color="text.disabled">
+                เพิ่มบัญชีเงินสด หุ้น หรือ Crypto เพื่อเริ่มต้น
+              </Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Asset Cards */}
-      <div className="space-y-4">
-        {/* Cash Card */}
-        <div className="glass-card p-5 hover:bg-gray-700/20 transition-all group border-l-4 border-green-500">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-              <Wallet size={28} className="text-green-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-lg mb-1">💵 เงินสด</h3>
-              <p className="text-gray-400 text-sm">{summary.cashCount} บัญชี</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-bold text-xl">{formatCurrency(summary.cash)}</p>
-              <p className="text-green-400 text-sm font-medium mt-1">
-                {summary.totalWealth > 0 ? ((summary.cash / summary.totalWealth) * 100).toFixed(1) : '0'}%
-              </p>
-            </div>
-          </div>
-        </div>
+      <Stack spacing={2}>
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: 'success.main', width: 56, height: 56 }}>
+                <AccountBalanceWallet sx={{ fontSize: 28 }} />
+              </Avatar>
+              <Box flex={1}>
+                <Typography variant="h6" fontWeight="bold">
+                  💵 เงินสด
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {summary.cashCount} บัญชี
+                </Typography>
+              </Box>
+              <Box textAlign="right">
+                <Typography variant="h6" fontWeight="bold">
+                  {formatCurrency(summary.cash)}
+                </Typography>
+                <Typography variant="body2" color="success.main">
+                  {summary.totalWealth > 0 ? ((summary.cash / summary.totalWealth) * 100).toFixed(1) : '0'}%
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
 
-        {/* Stocks Card */}
-        <div className="glass-card p-5 hover:bg-gray-700/20 transition-all group border-l-4 border-purple-500">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-              <TrendingUp size={28} className="text-purple-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-lg mb-1">📈 หุ้น & กองทุน</h3>
-              <p className="text-gray-400 text-sm">{summary.stockCount} รายการ</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-bold text-xl">{formatCurrency(summary.stocks)}</p>
-              <p className="text-purple-400 text-sm font-medium mt-1">
-                {summary.totalWealth > 0 ? ((summary.stocks / summary.totalWealth) * 100).toFixed(1) : '0'}%
-              </p>
-            </div>
-          </div>
-        </div>
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: 'secondary.main', width: 56, height: 56 }}>
+                <ShowChart sx={{ fontSize: 28 }} />
+              </Avatar>
+              <Box flex={1}>
+                <Typography variant="h6" fontWeight="bold">
+                  📈 หุ้น & กองทุน
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {summary.stockCount} รายการ
+                </Typography>
+              </Box>
+              <Box textAlign="right">
+                <Typography variant="h6" fontWeight="bold">
+                  {formatCurrency(summary.stocks)}
+                </Typography>
+                <Typography variant="body2" color="secondary.main">
+                  {summary.totalWealth > 0 ? ((summary.stocks / summary.totalWealth) * 100).toFixed(1) : '0'}%
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
 
-        {/* Crypto Card */}
-        <div className="glass-card p-5 hover:bg-gray-700/20 transition-all group border-l-4 border-yellow-500">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-              <Bitcoin size={28} className="text-yellow-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-lg mb-1">🪙 Cryptocurrency</h3>
-              <p className="text-gray-400 text-sm">{summary.cryptoCount} เหรียญ</p>
-            </div>
-            <div className="text-right">
-              <p className="text-white font-bold text-xl">{formatCurrency(summary.crypto)}</p>
-              <p className="text-yellow-400 text-sm font-medium mt-1">
-                {summary.totalWealth > 0 ? ((summary.crypto / summary.totalWealth) * 100).toFixed(1) : '0'}%
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <Card>
+          <CardContent>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Avatar sx={{ bgcolor: 'warning.main', width: 56, height: 56 }}>
+                <CurrencyBitcoin sx={{ fontSize: 28 }} />
+              </Avatar>
+              <Box flex={1}>
+                <Typography variant="h6" fontWeight="bold">
+                  🪙 Cryptocurrency
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {summary.cryptoCount} เหรียญ
+                </Typography>
+              </Box>
+              <Box textAlign="right">
+                <Typography variant="h6" fontWeight="bold">
+                  {formatCurrency(summary.crypto)}
+                </Typography>
+                <Typography variant="body2" color="warning.main">
+                  {summary.totalWealth > 0 ? ((summary.crypto / summary.totalWealth) * 100).toFixed(1) : '0'}%
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
 
-      {/* Performance Summary - only show when there's data */}
+      {/* Performance Summary */}
       {summary.netWealth > 0 && (
-        <div className="glass-card p-6 border-blue-500/20">
-          <h3 className="text-white font-bold mb-5 text-xl flex items-center gap-2">
-            📊 กำไรของสินทรัพย์ที่ถือครอง
-          </h3>
-          <div className="space-y-5">
-            <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">📅</div>
-                <span className="text-gray-300 font-medium">เปลี่ยนแปลงจากวันก่อน</span>
-              </div>
-              <span className={`font-bold text-lg ${change.dailyPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {change.dailyPercent >= 0 ? '↗' : '↘'} {change.dailyPercent >= 0 ? '+' : ''}{change.dailyPercent.toFixed(2)}%
-              </span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="text-2xl">📈</div>
-                <span className="text-gray-300 font-medium">กำไรสะสม (30 วัน)</span>
-              </div>
-              <div className="text-right">
-                <span className={`font-bold text-lg block ${change.monthlyPercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {change.monthlyPercent >= 0 ? '↗' : '↘'} {change.monthlyPercent >= 0 ? '+' : ''}{change.monthlyPercent.toFixed(2)}%
-                </span>
-                <span className={`text-sm ${change.monthlyPercent >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight="bold" mb={2}>
+              📊 กำไรของสินทรัพย์ที่ถือครอง
+            </Typography>
+            <Stack spacing={2}>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" color="text.secondary">
+                    📅 เปลี่ยนแปลงจากวันก่อน
+                  </Typography>
+                  <Chip
+                    label={`${change.dailyPercent >= 0 ? '+' : ''}${change.dailyPercent.toFixed(2)}%`}
+                    color={change.dailyPercent >= 0 ? 'success' : 'error'}
+                    size="small"
+                  />
+                </Stack>
+              </Box>
+              <Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={0.5}>
+                  <Typography variant="body2" color="text.secondary">
+                    📈 กำไรสะสม (30 วัน)
+                  </Typography>
+                  <Typography
+                    variant="body1"
+                    fontWeight="bold"
+                    color={change.monthlyPercent >= 0 ? 'success.main' : 'error.main'}
+                  >
+                    {change.monthlyPercent >= 0 ? '+' : ''}{change.monthlyPercent.toFixed(2)}%
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" color={change.monthlyPercent >= 0 ? 'success.main' : 'error.main'}>
                   {formatCurrency(change.monthly)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+                </Typography>
+              </Box>
+            </Stack>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </Stack>
   );
 }

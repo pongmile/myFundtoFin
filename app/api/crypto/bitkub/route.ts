@@ -27,6 +27,7 @@ export async function GET(request: Request) {
             'BNB': 'THB_BNB',
             'KUB': 'THB_KUB',
             'USDT': 'THB_USDT',
+            'ADA': 'THB_ADA',
         };
 
         const bitkubSymbol = symbolMap[symbol.toUpperCase()];
