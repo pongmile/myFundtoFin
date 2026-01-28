@@ -118,12 +118,34 @@ export default function DashboardMobile() {
       const stockItems = stocksData.data || [];
       let stocksTotal = 0;
       for (const item of stockItems) {
-        let value = parseFloat(item.cost_basis || 0);
-        if (item.currency && item.currency !== 'THB') {
-          const rate = await getExchangeRate(item.currency, 'THB');
-          value *= rate;
+        try {
+          const quantity = parseFloat(item.quantity || 0);
+          let price = 0;
+          
+          // Fetch real-time price based on data source
+          if (item.data_source === 'yahoo') {
+            const res = await axios.get(`/api/prices/stock?symbol=${item.symbol}`);
+            price = res.data.price || 0;
+          } else {
+            const res = await axios.get(
+              `/api/prices/fund?url=${encodeURIComponent(item.data_url || '')}&source=${item.data_source}&code=${item.symbol}`
+            );
+            price = res.data.price || 0;
+          }
+          
+          let value = price * quantity;
+          
+          // Convert to THB if needed
+          if (item.currency && item.currency !== 'THB') {
+            const rate = await getExchangeRate(item.currency, 'THB');
+            value *= rate;
+          }
+          
+          stocksTotal += value;
+        } catch (error) {
+          console.warn(`Failed to get price for ${item.symbol}, using cost basis`);
+          stocksTotal += parseFloat(item.cost_basis || 0);
         }
-        stocksTotal += value;
       }
 
       let liabilitiesTotal = 0;

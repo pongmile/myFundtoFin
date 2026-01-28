@@ -2,454 +2,517 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getExchangeRate, getCachedPrice } from '@/lib/cache';
+import { getExchangeRate } from '@/lib/cache';
 import { StockData } from '@/types';
-import { Plus, Edit2, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, ChevronDown, ChevronUp, RefreshCw, X } from 'lucide-react';
+
+const STOCK_TYPES = [
+    { value: 'stock_thai', label: 'หุ้นไทย', emoji: '🇹🇭', color: 'from-blue-600 to-indigo-600' },
+    { value: 'stock_foreign', label: 'หุ้นต่างประเทศ', emoji: '🌍', color: 'from-purple-600 to-pink-600' },
+    { value: 'fund_thai', label: 'กองทุนไทย', emoji: '📊', color: 'from-green-600 to-emerald-600' },
+    { value: 'fund_foreign', label: 'กองทุนต่างประเทศ', emoji: '🌐', color: 'from-orange-600 to-red-600' },
+];
+
+const DATA_SOURCES = [
+    { value: 'yahoo', label: 'Yahoo Finance' },
+    { value: 'scbam', label: 'SCBAM' },
+    { value: 'fundsupermart', label: 'FundSuperMart' },
+];
 
 export default function StocksAndFunds() {
-  const [stocks, setStocks] = useState<StockData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    symbol: '',
-    name: '',
-    type: 'stock_foreign',
-    quantity: 0,
-    cost_basis: 0,
-    currency: 'USD',
-    data_source: 'yahoo',
-    data_url: '',
-  });
+    const [stocks, setStocks] = useState<StockData[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [expanded, setExpanded] = useState(false);
+    const [totalValue, setTotalValue] = useState(0);
+    const [totalCost, setTotalCost] = useState(0);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadStocks();
-  }, []);
+    // Form states
+    const [selectedType, setSelectedType] = useState(STOCK_TYPES[0]);
+    const [symbol, setSymbol] = useState('');
+    const [name, setName] = useState('');
+    const [quantity, setQuantity] = useState('');
+    const [costBasis, setCostBasis] = useState('');
+    const [currency, setCurrency] = useState('USD');
+    const [dataSource, setDataSource] = useState('yahoo');
+    const [dataUrl, setDataUrl] = useState('');
 
-  const loadStocks = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('stocks')
-        .select('*')
-        .order('name');
+    const fetchStocks = async () => {
+        try {
+            setRefreshing(true);
+            const { data, error } = await supabase
+                .from('stocks')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-      if (error) throw error;
+            if (error) throw error;
 
-      // Fetch current prices
-      const stocksWithPrices = await Promise.all(
-        (data || []).map(async (stock) => {
-          const price = await fetchPrice(stock);
-          const totalValue = price * stock.quantity;
-          const costPerShare = stock.cost_basis / stock.quantity;
-          const profitLoss = totalValue - stock.cost_basis;
-          const profitLossPercent = (profitLoss / stock.cost_basis) * 100;
+            const stocksWithPrices = await Promise.all(
+                (data || []).map(async (stock) => {
+                    try {
+                        const price = await fetchPrice(stock);
+                        const currentValue = price * stock.quantity;
+                        const profitLoss = currentValue - stock.cost_basis;
+                        const profitLossPercent = stock.cost_basis > 0 ? (profitLoss / stock.cost_basis) * 100 : 0;
 
-          return {
-            ...stock,
-            current_price: price,
-            total_value: totalValue,
-            profit_loss: profitLoss,
-            profit_loss_percent: profitLossPercent,
-          };
-        })
-      );
+                        return {
+                            ...stock,
+                            current_price: price,
+                            total_value: currentValue,
+                            profit_loss: profitLoss,
+                            profit_loss_percent: profitLossPercent,
+                        };
+                    } catch (err) {
+                        console.error(`Error fetching price for ${stock.symbol}:`, err);
+                        return {
+                            ...stock,
+                            current_price: 0,
+                            total_value: 0,
+                            profit_loss: -stock.cost_basis,
+                            profit_loss_percent: -100,
+                        };
+                    }
+                })
+            );
 
-      setStocks(stocksWithPrices);
-    } catch (error) {
-      console.error('Error loading stocks:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+            setStocks(stocksWithPrices);
 
-  const fetchPrice = async (stock: StockData): Promise<number> => {
-    try {
-      if (stock.data_source === 'yahoo') {
-        const res = await fetch(`/api/prices/stock?symbol=${stock.symbol}`);
-        const data = await res.json();
-        let price = data.price || 0;
+            const total = stocksWithPrices.reduce((sum, stock) => sum + (stock.total_value || 0), 0);
+            const cost = stocksWithPrices.reduce((sum, stock) => sum + stock.cost_basis, 0);
 
-        // Convert to THB if needed
-        if (stock.currency === 'THB' && data.currency === 'USD') {
-          const rate = await getExchangeRate('USD', 'THB');
-          price *= rate;
+            setTotalValue(total);
+            setTotalCost(cost);
+        } catch (error) {
+            console.error('Error fetching stocks:', error);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
+    };
 
-        return price;
-      } else if (stock.data_source === 'scbam' || stock.data_source === 'fundsupermart') {
-        const res = await fetch(
-          `/api/prices/fund?url=${encodeURIComponent(stock.data_url || '')}&source=${stock.data_source}&code=${stock.symbol}`
-        );
-        const data = await res.json();
-        return data.price || 0;
-      }
+    const fetchPrice = async (stock: StockData): Promise<number> => {
+        try {
+            if (stock.data_source === 'yahoo') {
+                const res = await fetch(`/api/prices/stock?symbol=${stock.symbol}`);
+                const data = await res.json();
+                let price = data.price || 0;
 
-      return 0;
-    } catch (error) {
-      console.error('Error fetching price:', error);
-      return 0;
-    }
-  };
+                if (stock.currency !== 'THB') {
+                    const rate = await getExchangeRate(stock.currency, 'THB');
+                    price *= rate;
+                }
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadStocks();
-    setRefreshing(false);
-  };
+                return price;
+            } else {
+                const res = await fetch(
+                    `/api/prices/fund?url=${encodeURIComponent(stock.data_url || '')}&source=${stock.data_source}&code=${stock.symbol}`
+                );
+                const data = await res.json();
+                return data.price || 0;
+            }
+        } catch (error) {
+            console.error('Error fetching price:', error);
+            return 0;
+        }
+    };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('stocks')
-          .update(formData)
-          .eq('id', editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('stocks')
-          .insert([formData]);
-        if (error) throw error;
-      }
+    useEffect(() => {
+        fetchStocks();
+    }, []);
 
-      setShowForm(false);
-      setEditingId(null);
-      setFormData({
-        symbol: '',
-        name: '',
-        type: 'stock_foreign',
-        quantity: 0,
-        cost_basis: 0,
-        currency: 'USD',
-        data_source: 'yahoo',
-        data_url: '',
-      });
-      loadStocks();
-    } catch (error) {
-      console.error('Error saving stock:', error);
-      alert('เกิดข้อผิดพลาด: ' + (error as Error).message);
-    }
-  };
+    const handleEditStock = (stock: StockData) => {
+        setEditingId(stock.id);
+        const type = STOCK_TYPES.find(t => t.value === stock.type) || STOCK_TYPES[0];
+        setSelectedType(type);
+        setSymbol(stock.symbol);
+        setName(stock.name);
+        setQuantity(stock.quantity.toString());
+        setCostBasis(stock.cost_basis.toString());
+        setCurrency(stock.currency);
+        setDataSource(stock.data_source);
+        setDataUrl(stock.data_url || '');
+        setShowAddModal(true);
+        setExpanded(false);
+    };
 
-  const handleEdit = (stock: StockData) => {
-    setEditingId(stock.id);
-    setFormData({
-      symbol: stock.symbol,
-      name: stock.name,
-      type: stock.type,
-      quantity: stock.quantity,
-      cost_basis: stock.cost_basis,
-      currency: stock.currency,
-      data_source: stock.data_source,
-      data_url: stock.data_url || '',
-    });
-    setShowForm(true);
-  };
+    const handleUpdateStock = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('คุณต้องการลบรายการนี้หรือไม่?')) return;
+        if (!editingId) return;
 
-    try {
-      const { error } = await supabase
-        .from('stocks')
-        .delete()
-        .eq('id', id);
+        try {
+            const { error } = await supabase
+                .from('stocks')
+                .update({
+                    symbol: symbol,
+                    name: name,
+                    type: selectedType.value,
+                    quantity: parseFloat(quantity),
+                    cost_basis: parseFloat(costBasis),
+                    currency: currency,
+                    data_source: dataSource,
+                    data_url: dataUrl,
+                })
+                .eq('id', editingId);
 
-      if (error) throw error;
-      loadStocks();
-    } catch (error) {
-      console.error('Error deleting stock:', error);
-    }
-  };
+            if (error) throw error;
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('th-TH', {
-      style: 'currency',
-      currency: 'THB',
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4,
-    }).format(value);
-  };
+            setShowAddModal(false);
+            setEditingId(null);
+            setSymbol('');
+            setName('');
+            setQuantity('');
+            setCostBasis('');
+            setCurrency('USD');
+            setDataSource('yahoo');
+            setDataUrl('');
+            setSelectedType(STOCK_TYPES[0]);
+            fetchStocks();
+        } catch (error) {
+            console.error('Error updating stock:', error);
+            alert('เกิดข้อผิดพลาดในการอัพเดทสินทรัพย์');
+        }
+    };
 
-  const formatNumber = (value: number, decimals: number = 4) => {
-    return new Intl.NumberFormat('th-TH', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(value);
-  };
+    const handleAddStock = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-  if (loading) {
-    return <div className="text-center py-12">กำลังโหลด...</div>;
-  }
+        try {
+            const { error } = await supabase.from('stocks').insert([
+                {
+                    symbol: symbol,
+                    name: name,
+                    type: selectedType.value,
+                    quantity: parseFloat(quantity),
+                    cost_basis: parseFloat(costBasis),
+                    currency: currency,
+                    data_source: dataSource,
+                    data_url: dataUrl,
+                },
+            ]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-800">หุ้น & กองทุน</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
-            รีเฟรชราคา
-          </button>
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData({
-                symbol: '',
-                name: '',
-                type: 'stock_foreign',
-                quantity: 0,
-                cost_basis: 0,
-                currency: 'USD',
-                data_source: 'yahoo',
-                data_url: '',
-              });
-              setShowForm(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            <Plus size={18} />
-            เพิ่มรายการ
-          </button>
-        </div>
-      </div>
+            if (error) throw error;
 
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl m-4">
-            <h2 className="text-xl font-bold mb-4">
-              {editingId ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Symbol
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.symbol}
-                    onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ชื่อ
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
+            setShowAddModal(false);
+            setSymbol('');
+            setName('');
+            setQuantity('');
+            setCostBasis('');
+            setCurrency('USD');
+            setDataSource('yahoo');
+            setDataUrl('');
+            setSelectedType(STOCK_TYPES[0]);
+            fetchStocks();
+        } catch (error) {
+            console.error('Error adding stock:', error);
+            alert('เกิดข้อผิดพลาดในการเพิ่มสินทรัพย์');
+        }
+    };
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ประเภท
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="stock_thai">หุ้นไทย</option>
-                    <option value="stock_foreign">หุ้นต่างประเทศ</option>
-                    <option value="etf">ETF</option>
-                    <option value="fund">กองทุนรวม</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    แหล่งข้อมูล
-                  </label>
-                  <select
-                    value={formData.data_source}
-                    onChange={(e) => setFormData({ ...formData, data_source: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="yahoo">Yahoo Finance</option>
-                    <option value="scbam">SCBAM</option>
-                    <option value="fundsupermart">FundSuperMart</option>
-                  </select>
-                </div>
-              </div>
+    const handleDeleteStock = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('ต้องการลบสินทรัพย์นี้?')) return;
 
-              {(formData.data_source === 'scbam' || formData.data_source === 'fundsupermart') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.data_url}
-                    onChange={(e) => setFormData({ ...formData, data_url: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://..."
-                  />
-                </div>
-              )}
+        try {
+            const { error } = await supabase.from('stocks').delete().eq('id', id);
+            if (error) throw error;
+            fetchStocks();
+        } catch (error) {
+            console.error('Error deleting stock:', error);
+            alert('เกิดข้อผิดพลาดในการลบสินทรัพย์');
+        }
+    };
 
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    จำนวน
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ต้นทุนรวม
-                  </label>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    value={formData.cost_basis}
-                    onChange={(e) => setFormData({ ...formData, cost_basis: parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    สกุลเงิน
-                  </label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="THB">THB</option>
-                    <option value="USD">USD</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                >
-                  บันทึก
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingId(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-                >
-                  ยกเลิก
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Stocks Table */}
-      <div className="bg-white rounded-xl shadow-lg border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Symbol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อ</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ประเภท</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">จำนวน</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">ต้นทุนรวม</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">ราคาปัจจุบัน</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">มูลค่าปัจจุบัน</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">กำไร/ขาดทุน</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">%</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {stocks.map((stock) => (
-                <tr key={stock.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {stock.symbol}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {stock.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    <span className="px-2 py-1 bg-gray-100 rounded text-xs">
-                      {stock.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                    {formatNumber(stock.quantity)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                    {formatCurrency(stock.cost_basis)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                    {formatCurrency(stock.current_price || 0)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
-                    {formatCurrency(stock.total_value || 0)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                    <span className={(stock.profit_loss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {formatCurrency(stock.profit_loss || 0)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                    <span className={(stock.profit_loss_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {(stock.profit_loss_percent || 0).toFixed(2)}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => handleEdit(stock)}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(stock.id)}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/50">
+                        <TrendingUp className="w-7 h-7 text-white" strokeWidth={2.5} />
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">หุ้น & กองทุน</h1>
+                        <p className="text-gray-400 text-sm">Stocks & Funds</p>
+                    </div>
+                </div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={fetchStocks}
+                        disabled={refreshing}
+                        className="glass-button p-4"
+                    >
+                        <RefreshCw className={`w-5 h-5 text-gray-300 ${refreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={() => setShowAddModal(!showAddModal)}
+                        className={`px-8 py-4 rounded-2xl text-white font-bold flex items-center gap-3 transition-all ${showAddModal
+                                ? 'bg-gray-700 hover:bg-gray-600'
+                                : 'gradient-primary'
+                            }`}
+                    >
+                        {showAddModal ? <X className="w-5 h-5" strokeWidth={3} /> : <Plus className="w-5 h-5" strokeWidth={3} />}
+                        <span>{showAddModal ? 'ปิด' : 'เพิ่ม'}</span>
+                    </button>
+                </div>
+            </div>
 
-        {stocks.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            ยังไม่มีรายการ คลิกปุ่ม "เพิ่มรายการ" เพื่อเริ่มต้น
-          </div>
-        )}
-      </div>
-    </div>
-  );
+            {/* Add Form - Top Section */}
+            {showAddModal && (
+                <div className="glass-card p-8">
+                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                            <Plus className="w-5 h-5 text-white" strokeWidth={3} />
+                        </div>
+                        เพิ่มสินทรัพย์ใหม่
+                    </h2>
+
+                    <form onSubmit={editingId ? handleUpdateStock : handleAddStock} className="space-y-6">
+                        {/* Stock Type Selection */}
+                        <div>
+                            <label className="block text-white text-sm font-bold mb-3">ประเภทสินทรัพย์</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {STOCK_TYPES.map((type) => (
+                                    <button
+                                        key={type.value}
+                                        type="button"
+                                        onClick={() => setSelectedType(type)}
+                                        className={`glass-button p-4 transition-all ${selectedType.value === type.value
+                                                ? 'bg-gradient-to-br from-purple-500/20 to-pink-500/20 border-purple-400/50 shadow-lg'
+                                                : 'hover:bg-white/10'
+                                            }`}
+                                    >
+                                        <div className={`w-12 h-12 bg-gradient-to-br ${type.color} rounded-xl flex items-center justify-center text-2xl mx-auto mb-2 shadow-lg`}>
+                                            {type.emoji}
+                                        </div>
+                                        <p className="text-white font-bold text-sm">{type.label}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Symbol */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">สัญลักษณ์</label>
+                                <input
+                                    type="text"
+                                    value={symbol}
+                                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    placeholder="AAPL, PTT"
+                                    required
+                                />
+                            </div>
+
+                            {/* Name */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">ชื่อ</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    placeholder="Apple Inc."
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Quantity */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">จำนวนหุ้น</label>
+                                <input
+                                    type="number"
+                                    step="0.001"
+                                    value={quantity}
+                                    onChange={(e) => setQuantity(e.target.value)}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    placeholder="0.000"
+                                    required
+                                />
+                            </div>
+
+                            {/* Cost Basis */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">ราคาที่ซื้อ</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={costBasis}
+                                    onChange={(e) => setCostBasis(e.target.value)}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    placeholder="0.00"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Currency */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">สกุลเงิน</label>
+                                <select
+                                    value={currency}
+                                    onChange={(e) => setCurrency(e.target.value)}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                >
+                                    <option value="THB">THB</option>
+                                    <option value="USD">USD</option>
+                                    <option value="CAD">CAD</option>
+                                </select>
+                            </div>
+
+                            {/* Data Source */}
+                            <div>
+                                <label className="block text-white text-sm font-bold mb-2">แหล่งข้อมูล</label>
+                                <select
+                                    value={dataSource}
+                                    onChange={(e) => setDataSource(e.target.value)}
+                                    className="w-full glass-button px-4 py-3 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                >
+                                    <option value="yahoo">Yahoo Finance</option>
+                                    <option value="scbam">SCBAM</option>
+                                    <option value="fundsupermart">FundSuperMart</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Submit Button */}
+                        <button
+                            type="submit"
+                            className="w-full gradient-primary py-4 rounded-xl text-white font-bold hover:shadow-2xl transition-all"
+                        >
+                            {editingId ? 'อัพเดท' : 'เพิ่ม'} {selectedType.label}
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {/* Loading State */}
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <RefreshCw className="w-8 h-8 text-purple-500 animate-spin" />
+                </div>
+            ) : stocks.length === 0 ? (
+                <div className="text-center py-20">
+                    <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400 text-lg mb-2">ยังไม่มีสินทรัพย์</p>
+                    <p className="text-gray-500 text-sm">กดปุ่มเพิ่มเพื่อเริ่มต้น</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {/* Summary Card - Collapsible */}
+                    <div className="glass-card overflow-hidden">
+                        {/* Header - Always Visible */}
+                        <button
+                            onClick={() => setExpanded(!expanded)}
+                            className="w-full p-8 text-left hover:bg-white/5 transition-all"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                        <TrendingUp className="w-6 h-6 text-white" strokeWidth={2.5} />
+                                    </div>
+                                    <div>
+                                        <p className="text-white font-bold text-xl">Stocks Portfolio</p>
+                                        <p className="text-gray-400 text-sm">{stocks.length} สินทรัพย์</p>
+                                    </div>
+                                </div>
+                                <div className="glass-button p-3 rounded-xl">
+                                    {expanded ? (
+                                        <ChevronUp className="w-6 h-6 text-gray-300" />
+                                    ) : (
+                                        <ChevronDown className="w-6 h-6 text-gray-300" />
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-gray-400 text-sm mb-2">มูลค่าสินทรัพย์ทั้งหมด</p>
+                                    <h2 className="text-4xl font-bold text-white mb-1">
+                                        ฿{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </h2>
+                                </div>
+
+                                <div className={`glass-button px-4 py-3 rounded-xl inline-flex items-center gap-2 ${(totalValue - totalCost) >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                                    <div>
+                                        <span className={`font-bold text-base ${(totalValue - totalCost) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {(totalValue - totalCost) >= 0 ? '+' : ''}฿{Math.abs(totalValue - totalCost).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                        </span>
+                                        <span className="text-gray-500 text-xs ml-2">
+                                            ({((totalValue - totalCost) / totalCost * 100).toFixed(2)}%)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </button>
+
+                        {/* Expanded Details */}
+                        {expanded && (
+                            <div className="border-t border-white/10 px-6 pb-6">
+                                <div className="space-y-3 mt-6">
+                                    {stocks.map((stock) => {
+                                        const type = STOCK_TYPES.find(t => t.value === stock.type) || STOCK_TYPES[0];
+                                        return (
+                                            <div
+                                                key={stock.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleEditStock(stock);
+                                                }}
+                                                className="glass-button p-5 hover:bg-white/10 cursor-pointer group relative"
+                                            >
+                                                {/* Delete Button */}
+                                                <button
+                                                    onClick={(e) => handleDeleteStock(stock.id, e)}
+                                                    className="absolute top-4 right-4 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="ลบ"
+                                                >
+                                                    <X className="w-4 h-4 text-red-400" />
+                                                </button>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 bg-gradient-to-br ${type.color} rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform`}>
+                                                        {type.emoji}
+                                                    </div>
+
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-baseline gap-2">
+                                                            <h3 className="text-white font-bold text-lg">{stock.symbol}</h3>
+                                                        </div>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-gray-400 text-sm truncate">{stock.name}</span>
+                                                        </div>
+                                                        <p className="text-gray-500 text-sm">{stock.quantity.toLocaleString()} หน่วย</p>
+                                                        <p className="text-gray-500 text-sm">{type.label}</p>
+                                                    </div>
+
+                                                    <div className="text-right">
+                                                        <p className="text-white font-bold text-lg mb-1">
+                                                            ฿{(stock.total_value || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                                        </p>
+                                                        <div className={`glass-button px-3 py-1 rounded-lg inline-flex items-center gap-1 ${(stock.profit_loss || 0) >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+                                                            {(stock.profit_loss || 0) >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                                            <span className={`text-sm font-bold ${(stock.profit_loss || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                {(stock.profit_loss || 0) >= 0 ? '+' : ''}{(stock.profit_loss_percent || 0).toFixed(2)}%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
