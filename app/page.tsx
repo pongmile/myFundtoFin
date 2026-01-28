@@ -27,8 +27,8 @@ export default function Home() {
     { id: 'history' as TabType, name: 'History', icon: History, label: 'ลงทุน' },
     { id: 'cash' as TabType, name: 'Cash', icon: Wallet, label: 'เงินสด' },
     { id: 'stocks' as TabType, name: 'Stocks', icon: PieChartIcon, label: 'สินทรัพย์' },
-    { id: 'crypto' as TabType, name: 'Crypto', icon: Bitcoin, label: 'รายการ' },
-    { id: 'liabilities' as TabType, name: 'Liabilities', icon: CreditCard, label: 'ฉัน' },
+    { id: 'crypto' as TabType, name: 'Crypto', icon: Bitcoin, label: 'Crypto' },
+    { id: 'liabilities' as TabType, name: 'Liabilities', icon: CreditCard, label: 'หนี้' },
   ];
 
   const renderContent = () => {
@@ -51,42 +51,39 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-[#0a0e1a] via-[#0f1525] to-[#1a0f2e]">
-      {/* Main Content with bottom padding for nav */}
-      <main className="flex-1 overflow-auto pb-20">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+    <div className="flex flex-col h-screen bg-gradient-to-br from-[#0a0e1a] via-[#1a1f35] to-[#0f1525]">
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto pb-48 pt-4 mt-[50px]">
+        <div className="max-w-6xl mx-auto px-6 py-6">
           {renderContent()}
         </div>
       </main>
 
-      {/* Bottom Navigation - Mobile First */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#12172d]/95 backdrop-blur-xl border-t border-gray-800/50 safe-area-inset-bottom">
-        <div className="flex items-center justify-around px-2 py-2">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center justify-center min-w-[60px] py-2 px-3 rounded-xl transition-all ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-gray-500'
-                }`}
-              >
-                <div className={`relative ${isActive ? 'scale-110' : ''} transition-transform`}>
-                  <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                  {isActive && (
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-400 rounded-full"></div>
-                  )}
-                </div>
-                <span className={`text-xs mt-1 font-medium ${isActive ? 'text-white' : 'text-gray-500'}`}>
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
+      {/* Bottom Navigation - Liquid Glass */}
+      <nav className="glass-nav fixed bottom-0 left-0 right-0 z-[9999] safe-area-inset-bottom !pointer-events-auto">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-around py-3">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex flex-col items-center justify-center min-w-[70px] py-3 px-4 rounded-2xl transition-all ${
+                    isActive
+                      ? 'gradient-primary shadow-xl scale-110'
+                      : 'glass-button hover:bg-white/10'
+                  }`}
+                >
+                  <Icon size={26} strokeWidth={isActive ? 3 : 2} className={isActive ? 'text-white' : 'text-gray-400'} />
+                  <span className={`text-xs mt-2 font-bold ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
     </div>

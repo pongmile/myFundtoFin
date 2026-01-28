@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, RefreshCw, Wallet, Bitcoin, Eye, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, Wallet, Bitcoin, Eye, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getExchangeRate } from '@/lib/cache';
 import axios from 'axios';
@@ -261,10 +261,10 @@ export default function DashboardMobile() {
   }
 
   return (
-    <div className="space-y-6 pb-6 px-1">
+    <div className="space-y-6 pb-8 px-4 max-w-2xl mx-auto">
       {/* Mobile-First Header */}
-      <div className="text-center pt-4">
-        <div className="flex items-center justify-center gap-2 mb-3">
+      <div className="text-center pt-6">
+        <div className="flex items-center justify-center gap-2 mb-4">
           <p className="text-gray-300 text-base font-medium">💰 สินทรัพย์ของฉัน</p>
         </div>
         <h1 className="text-5xl md:text-6xl font-bold text-white mb-3 tracking-tight">
@@ -346,7 +346,7 @@ export default function DashboardMobile() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className=" inset-0 flex items-center justify-center pointer-events-none">
                 <div className="text-center">
                   <p className="text-gray-400 text-xs">Total</p>
                   <p className="text-white font-bold text-lg">{formatCurrency(summary.totalWealth)}</p>
@@ -355,16 +355,16 @@ export default function DashboardMobile() {
             </div>
 
             {/* Legend */}
-            <div className="grid grid-cols-2 gap-5 mt-6">
+            <div className="grid grid-cols-2 gap-4 mt-6">
               {pieData.map((item, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/30 hover:bg-gray-700/30 transition-all">
-                  <div className="w-4 h-4 rounded-full flex-shrink-0 shadow-lg" style={{ backgroundColor: item.color }}></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-300 mb-1">{item.name}</p>
-                    <p className="text-lg font-bold text-white">
-                      {summary.totalWealth > 0 ? ((item.value / summary.totalWealth) * 100).toFixed(1) : '0'}%
-                    </p>
+                <div key={index} className="flex flex-col gap-2 p-4 rounded-xl bg-gray-800/30 hover:bg-gray-700/30 transition-all">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 shadow-lg" style={{ backgroundColor: item.color }}></div>
+                    <p className="text-xs text-gray-400 truncate">{item.name}</p>
                   </div>
+                  <p className="text-lg font-bold text-white">
+                    {summary.totalWealth > 0 ? ((item.value / summary.totalWealth) * 100).toFixed(1) : '0'}%
+                  </p>
                 </div>
               ))}
             </div>
