@@ -140,23 +140,42 @@ export default function DashboardMobile() {
           const quantity = parseFloat(item.quantity || 0);
           let price = 0;
           
-          if (item.data_source === 'yahoo') {
+          // Use manual price if available (for AI Port, Robo Advisor, Manual)
+          if (['scb_robo', 'guru_portfolio', 'manual'].includes(item.data_source)) {
+            price = parseFloat(item.manual_price || 0);
+          }
+          // Use Gold API for gold commodities (USD per Troy Ounce)
+          else if (item.type === 'gold' || item.data_source === 'gold_api') {
+            const res = await axios.get('/api/prices/gold');
+            const priceUSD = res.data.price || 0;
+            const thbRate = await getExchangeRate('USD', 'THB');
+            price = priceUSD * thbRate; // THB per Troy Ounce
+          }
+          // Use SET API for Thai stocks
+          else if (item.type === 'stock_thai' && item.data_source === 'yahoo') {
+            const res = await axios.get(`/api/prices/set?symbol=${item.symbol}`);
+            price = res.data.price || 0; // Already in THB
+          }
+          // Use Yahoo Finance for foreign stocks
+          else if (item.data_source === 'yahoo') {
             const res = await axios.get(`/api/prices/stock?symbol=${item.symbol}`);
             price = res.data.price || 0;
-          } else {
+            
+            // Convert price to THB if needed
+            if (item.currency && item.currency !== 'THB') {
+              const rate = await getExchangeRate(item.currency, 'THB');
+              price *= rate;
+            }
+          }
+          // Use fund APIs for mutual funds
+          else {
             const res = await axios.get(
               `/api/prices/fund?url=${encodeURIComponent(item.data_url || '')}&source=${item.data_source}&code=${item.symbol}`
             );
-            price = res.data.price || 0;
+            price = res.data.price || 0; // Already in THB
           }
           
-          let value = price * quantity;
-          
-          if (item.currency && item.currency !== 'THB') {
-            const rate = await getExchangeRate(item.currency, 'THB');
-            value *= rate;
-          }
-          
+          const value = price * quantity;
           stocksTotal += value;
         } catch (error) {
           console.warn(`Failed to get price for ${item.symbol}, using cost basis`);

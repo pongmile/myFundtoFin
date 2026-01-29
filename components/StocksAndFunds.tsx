@@ -203,13 +203,25 @@ export default function StocksAndFunds() {
     fetchStocks();
   }, []);
 
-  const handleOpenDialog = (stock?: StockData) => {
+  const handleOpenDialog = async (stock?: StockData) => {
     if (stock) {
       setEditingId(stock.id);
       setSymbol(stock.symbol);
       setName(stock.name);
       setQuantity(stock.quantity.toString());
-      setCostBasis(stock.cost_basis.toString());
+      
+      // Convert cost_basis back to original currency for editing
+      let displayCostBasis = stock.cost_basis;
+      if (stock.currency !== 'THB') {
+        try {
+          const rate = await getExchangeRate(stock.currency, 'THB');
+          displayCostBasis = stock.cost_basis / rate;
+        } catch (error) {
+          console.warn('Failed to convert cost basis, using stored value');
+        }
+      }
+      setCostBasis(displayCostBasis.toFixed(2));
+      
       setCurrency(stock.currency);
       setDataSource(stock.data_source);
       setDataUrl(stock.data_url || '');
@@ -240,12 +252,19 @@ export default function StocksAndFunds() {
     e.preventDefault();
 
     try {
+      // Convert cost basis to THB if not already
+      let costBasisInTHB = parseFloat(costBasis);
+      if (currency !== 'THB') {
+        const rate = await getExchangeRate(currency, 'THB');
+        costBasisInTHB = costBasisInTHB * rate;
+      }
+
       const stockData = {
         symbol: symbol.toUpperCase(),
         name,
         type: selectedType.value,
         quantity: parseFloat(quantity),
-        cost_basis: parseFloat(costBasis),
+        cost_basis: costBasisInTHB,
         currency,
         data_source: dataSource,
         data_url: dataUrl || null,
@@ -488,24 +507,28 @@ export default function StocksAndFunds() {
 
               <Stack direction="row" spacing={2}>
                 <TextField
-                  label={selectedType.value === 'gold' ? 'จำนวน (Troy Oz)' : 'จำนวน'}
+                  label="จำนวน"
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
                   fullWidth
-                  inputProps={{ step: selectedType.value === 'gold' ? '0.01' : '0.0001', min: '0' }}
+                  inputProps={{ step: selectedType.value === 'gold' ? '0.01' : '0.00001', min: '0' }}
                   helperText={selectedType.value === 'gold' ? '1 Troy Oz = 31.1035 กรัม' : ''}
                 />
 
                 <TextField
-                  label="ต้นทุน (THB)"
+                  label={`ต้นทุน (${currency})`}
                   type="number"
                   value={costBasis}
                   onChange={(e) => setCostBasis(e.target.value)}
                   required
                   fullWidth
                   inputProps={{ step: '0.01', min: '0' }}
+                  helperText={currency !== 'THB' ? `จะถูกแปลงเป็น THB อัตโนมัติ` : 'ต้นทุนรวมทั้งหมด'}
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>{currency === 'THB' ? '฿' : currency === 'USD' ? '$' : currency}</Typography>,
+                  }}
                 />
               </Stack>
 

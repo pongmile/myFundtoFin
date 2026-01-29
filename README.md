@@ -14,6 +14,7 @@ A comprehensive wealth portfolio management web application built with Next.js, 
 ### 📈 Wealth History
 - Complete historical tracking of all assets
 - Daily snapshots of cash, crypto, stocks
+- **🆕 Automatic daily saving** - Configure cron to save automatically
 - Difference tracking (increases/decreases)
 - Cost basis recording
 

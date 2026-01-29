@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/wealth-history/cron",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

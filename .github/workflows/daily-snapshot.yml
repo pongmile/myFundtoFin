@@ -1,0 +1,22 @@
+name: Daily Wealth History Snapshot
+
+on:
+  schedule:
+    # Run at 00:00 UTC every day (07:00 Bangkok time)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Wealth History Snapshot
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            ${{ secrets.APP_URL }}/api/wealth-history/cron
+        
+      - name: Log Completion
+        run: echo "Daily snapshot completed at $(date)"
