@@ -9,6 +9,9 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // VERSION: v2-correct-usd-conversion
+    console.log('[SAVE API] Running version: v2-correct-usd-conversion');
+
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
 
