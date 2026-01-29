@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { calculatePortfolioValues } from '@/lib/portfolio-calculator';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -11,21 +12,16 @@ export async function POST(request: NextRequest) {
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch all current data
-    const [cashData, cryptoData, stocksData, liabilitiesData] = await Promise.all([
-      supabase.from('cash_accounts').select('*'),
-      supabase.from('crypto').select('*'),
-      supabase.from('stocks').select('*'),
-      supabase.from('liabilities').select('*'),
-    ]);
-
-    // Calculate totals (simplified - should include real-time prices)
-    const cashTotal = cashData.data?.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0) || 0;
-    const cryptoTotal = cryptoData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
-    const stocksTotal = stocksData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
-    const liabilitiesTotal = liabilitiesData.data?.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0) || 0;
-
-    const totalWealth = cashTotal + cryptoTotal + stocksTotal;
+    // Calculate real-time portfolio values
+    const {
+      cashTotal,
+      cryptoTotal,
+      stocksTotal,
+      liabilitiesTotal,
+      totalWealth,
+      cryptoCostBasis,
+      stocksCostBasis,
+    } = await calculatePortfolioValues(supabaseUrl, supabaseServiceKey);
 
     // Get yesterday's data for calculating diffs
     const yesterday = new Date();
@@ -56,8 +52,8 @@ export async function POST(request: NextRequest) {
         cash_diff: cashDiff,
         crypto_diff: cryptoDiff,
         stocks_diff: stocksDiff,
-        crypto_cost_basis: cryptoTotal, // Should use actual cost basis
-        stocks_cost_basis: stocksTotal, // Should use actual cost basis
+        crypto_cost_basis: cryptoCostBasis,
+        stocks_cost_basis: stocksCostBasis
       }, {
         onConflict: 'date',
         ignoreDuplicates: false
