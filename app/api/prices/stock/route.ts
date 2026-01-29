@@ -11,11 +11,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Check cache unless force refresh
+    // Check cache first for faster response
     if (!forceRefresh) {
-      const cached = await getCachedPrice('stock', symbol, 'THB');
+      const cached = await getCachedPrice('stock', symbol, 'USD');
       if (cached) {
-        return NextResponse.json({ price: cached, source: 'cache' });
+        // Return cached data immediately
+        const cachedResponse = NextResponse.json({ 
+          price: cached, 
+          currency: 'USD',
+          source: 'yahoo_cache',
+          cached: true
+        });
+
+        // Update cache in background without waiting
+        updateCacheInBackground(symbol);
+
+        return cachedResponse;
       }
     }
 
@@ -42,7 +53,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       price, 
       currency: 'USD',
-      source: 'yahoo' 
+      source: 'yahoo',
+      cached: false
     });
   } catch (error) {
     console.error('Yahoo Finance API error:', error);
@@ -52,7 +64,9 @@ export async function GET(request: NextRequest) {
     if (fallbackCache) {
       return NextResponse.json({ 
         price: fallbackCache, 
-        source: 'cache_fallback',
+        currency: 'USD',
+        source: 'yahoo_cache_fallback',
+        cached: true,
         warning: 'Using cached data due to API error'
       });
     }
@@ -61,5 +75,26 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to fetch stock price' },
       { status: 500 }
     );
+  }
+}
+
+// Background function to update cache
+async function updateCacheInBackground(symbol: string) {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`,
+      { next: { revalidate: 900 } } // 15 minutes
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      
+      if (price) {
+        await setCachedPrice('stock', symbol, price, 'USD', 'yahoo');
+      }
+    }
+  } catch (error) {
+    console.error('Background cache update failed:', error);
   }
 }

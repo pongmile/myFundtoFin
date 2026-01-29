@@ -1,15 +1,35 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+import { getCachedPrice, setCachedPrice } from '@/lib/cache';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = searchParams.get('symbol');
+  const forceRefresh = searchParams.get('refresh') === 'true';
 
   if (!symbol) {
     return NextResponse.json({ error: 'Symbol is required' }, { status: 400 });
   }
 
   try {
+    // Check cache first for faster response
+    if (!forceRefresh) {
+      const cached = await getCachedPrice('crypto', symbol, 'USD');
+      if (cached) {
+        // Return cached data immediately
+        const cachedResponse = NextResponse.json({
+          symbol,
+          price: cached,
+          source: 'cryptoprices_cache',
+          cached: true
+        });
+
+        // Update cache in background without waiting
+        updateCacheInBackground(symbol);
+
+        return cachedResponse;
+      }
+    }
     // Try CoinGecko API (free, no API key required)
     const coinGeckoId = getCoinGeckoId(symbol);
     const response = await fetch(`https://cryptoprices.cc/${symbol}/`);
@@ -21,17 +41,32 @@ export async function GET(request: Request) {
     if (response.ok) {
       const priceUSD = parseFloat(await response.text());
       if (!isNaN(priceUSD)) {
+        // Cache the price for future requests
+        await setCachedPrice('crypto', symbol, priceUSD, 'USD', 'cryptoprices');
+        
         return NextResponse.json({
           symbol,
           price: priceUSD,
           source: 'cryptoprices',
+          cached: false
         });
       }
       
       
     }
 
-    // Fallback: return 0 if not found
+    // Fallback: try to return cached price
+    const fallbackCache = await getCachedPrice('crypto', symbol, 'USD');
+    if (fallbackCache) {
+      return NextResponse.json({
+        symbol,
+        price: fallbackCache,
+        source: 'cryptoprices_cache_fallback',
+        cached: true,
+        warning: 'Using cached data due to API failure'
+      });
+    }
+    
     return NextResponse.json({
       symbol,
       price: 0,
@@ -41,6 +76,18 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching crypto price:', error);
     
+    // Try to return cached price as fallback
+    const fallbackCache = await getCachedPrice('crypto', symbol, 'USD');
+    if (fallbackCache) {
+      return NextResponse.json({
+        symbol,
+        price: fallbackCache,
+        source: 'cryptoprices_cache_fallback',
+        cached: true,
+        warning: 'Using cached data due to API error'
+      });
+    }
+    
     // Return 0 instead of error
     return NextResponse.json({
       symbol,
@@ -48,6 +95,21 @@ export async function GET(request: Request) {
       change_24h: 0,
       source: 'error',
     });
+  }
+}
+
+// Background function to update cache
+async function updateCacheInBackground(symbol: string) {
+  try {
+    const response = await fetch(`https://cryptoprices.cc/${symbol}/`);
+    if (response.ok) {
+      const priceUSD = parseFloat(await response.text());
+      if (!isNaN(priceUSD)) {
+        await setCachedPrice('crypto', symbol, priceUSD, 'USD', 'cryptoprices');
+      }
+    }
+  } catch (error) {
+    console.error('Background cache update failed:', error);
   }
 }
 

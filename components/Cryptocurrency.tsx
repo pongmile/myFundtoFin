@@ -137,38 +137,58 @@ export default function Cryptocurrency() {
   };
 
   const updatePricesInBackground = async (assets: any[]) => {
-    // Update prices in background without blocking UI
-    for (const asset of assets) {
-      try {
-        const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH', 'USDT', 'ADA'].includes(asset.symbol.toUpperCase());
-        const apiUrl = useBitkub
-          ? `/api/crypto/bitkub?symbol=${asset.symbol}`
-          : `/api/crypto/price?symbol=${asset.symbol}`;
+    // Use batch API for better performance
+    try {
+      const symbols = assets.map(a => a.symbol).join(',');
+      const response = await axios.get(`/api/prices/batch?symbols=${symbols}&type=crypto`);
+      
+      if (response.data.results) {
+        // Update display with batch results
+        response.data.results.forEach((result: any) => {
+          const asset = assets.find(a => a.symbol === result.symbol);
+          if (asset && result.price > 0) {
+            const currentPrice = result.price;
+            const currentValue = currentPrice * asset.quantity;
+            const profitLoss = currentValue - asset.cost_basis;
+            const profitLossPercent = asset.cost_basis > 0 ? (profitLoss / asset.cost_basis) * 100 : 0;
 
-        const response = await axios.get(apiUrl);
-        const currentPrice = response.data.priceThb || response.data.price || 0;
-        const change24h = response.data.change24h || 0;
-
-        // Save to price_cache
-        await supabase.from('price_cache').upsert({
-          asset_type: 'crypto',
-          symbol: asset.symbol,
-          price: currentPrice,
-          currency: 'THB',
-        }, { onConflict: 'asset_type,symbol' });
-
-        // Update display
-        setAssets(prev => prev.map(a => {
-          if (a.symbol === asset.symbol) {
-            const currentValue = currentPrice * a.quantity;
-            const profitLoss = currentValue - a.cost_basis;
-            const profitLossPercent = a.cost_basis > 0 ? (profitLoss / a.cost_basis) * 100 : 0;
-            return { ...a, currentPrice, currentValue, profitLoss, profitLossPercent, change24h };
+            setAssets(prev => prev.map(a => {
+              if (a.symbol === asset.symbol) {
+                return { ...a, currentPrice, currentValue, profitLoss, profitLossPercent, change24h: 0 };
+              }
+              return a;
+            }));
           }
-          return a;
-        }));
-      } catch (err) {
-        console.error(`Background update failed for ${asset.symbol}:`, err);
+        });
+      }
+    } catch (error) {
+      console.error('Batch update failed, falling back to individual updates:', error);
+      
+      // Fallback to individual updates
+      for (const asset of assets) {
+        try {
+          const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH', 'USDT', 'ADA'].includes(asset.symbol.toUpperCase());
+          const apiUrl = useBitkub
+            ? `/api/crypto/bitkub?symbol=${asset.symbol}`
+            : `/api/crypto/price?symbol=${asset.symbol}`;
+
+          const response = await axios.get(apiUrl);
+          const currentPrice = response.data.priceThb || response.data.price || 0;
+          const change24h = response.data.change24h || 0;
+
+          // Update display
+          setAssets(prev => prev.map(a => {
+            if (a.symbol === asset.symbol) {
+              const currentValue = currentPrice * a.quantity;
+              const profitLoss = currentValue - a.cost_basis;
+              const profitLossPercent = a.cost_basis > 0 ? (profitLoss / a.cost_basis) * 100 : 0;
+              return { ...a, currentPrice, currentValue, profitLoss, profitLossPercent, change24h };
+            }
+            return a;
+          }));
+        } catch (err) {
+          console.error(`Background update failed for ${asset.symbol}:`, err);
+        }
       }
     }
   };
