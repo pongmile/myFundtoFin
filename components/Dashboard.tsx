@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getExchangeRate } from '@/lib/cache';
+import { priceUpdater } from '@/lib/price-updater';
 
 interface PortfolioSummary {
   totalWealth: number;
@@ -53,7 +54,7 @@ export default function Dashboard() {
         return;
       }
 
-      // Fetch all data
+      // Fetch all data in parallel for fast display
       const [cashData, cryptoData, stocksData, liabilitiesData, historyData] = await Promise.all([
         supabase.from('cash_accounts').select('*'),
         supabase.from('crypto').select('*'),
@@ -62,7 +63,7 @@ export default function Dashboard() {
         supabase.from('wealth_history').select('*').order('date', { ascending: false }).limit(90),
       ]);
 
-      // Calculate cash total
+      // Calculate cash total with currency conversion
       let cashTotal = 0;
       if (cashData.data) {
         for (const account of cashData.data) {
@@ -75,19 +76,23 @@ export default function Dashboard() {
         }
       }
 
-      // Calculate crypto total (simplified - will fetch prices in real implementation)
+      // Use cost_basis for instant display (values in database are already current)
       const cryptoTotal = cryptoData.data?.reduce((sum, item) => {
         return sum + parseFloat(item.cost_basis || 0);
       }, 0) || 0;
 
-      // Calculate stocks total (simplified)
-      const stocksTotal = stocksData.data?.reduce((sum, item) => {
-        let value = parseFloat(item.cost_basis || 0);
-        if (item.currency === 'USD') {
-          value *= 35.5; // Should use real exchange rate
+      // Use cost_basis for instant display with currency conversion
+      let stocksTotal = 0;
+      if (stocksData.data) {
+        for (const stock of stocksData.data) {
+          let value = parseFloat(stock.cost_basis || 0);
+          if (stock.currency === 'USD') {
+            const rate = await getExchangeRate('USD', 'THB');
+            value *= rate;
+          }
+          stocksTotal += value;
         }
-        return sum + value;
-      }, 0) || 0;
+      }
 
       // Calculate liabilities
       let liabilitiesTotal = 0;
