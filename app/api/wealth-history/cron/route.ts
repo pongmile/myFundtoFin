@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { calculatePortfolioValues } from '@/lib/portfolio-calculator';
+import { getExchangeRate } from '@/lib/cache';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -46,16 +46,61 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Calculate real-time portfolio values
-    const {
-      cashTotal,
-      cryptoTotal,
-      stocksTotal,
-      liabilitiesTotal,
-      totalWealth,
-      cryptoCostBasis,
-      stocksCostBasis,
-    } = await calculatePortfolioValues(supabaseUrl, supabaseServiceKey);
+    // Fetch all current data
+    const [cashData, cryptoData, stocksData, liabilitiesData] = await Promise.all([
+      supabase.from('cash_accounts').select('*'),
+      supabase.from('crypto').select('*'),
+      supabase.from('stocks').select('*'),
+      supabase.from('liabilities').select('*'),
+    ]);
+
+    // Calculate cash total with currency conversion
+    let cashTotal = 0;
+    if (cashData.data) {
+      for (const account of cashData.data) {
+        let amount = parseFloat(account.amount || 0);
+        if (account.currency !== 'THB') {
+          const rate = await getExchangeRate(account.currency, 'THB');
+          amount *= rate;
+        }
+        cashTotal += amount;
+      }
+    }
+
+    // Use cost_basis for crypto and stocks (current values in database)
+    const cryptoTotal = cryptoData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
+    const cryptoCostBasis = cryptoTotal;
+
+    let stocksTotal = 0;
+    let stocksCostBasis = 0;
+    if (stocksData.data) {
+      for (const stock of stocksData.data) {
+        let cost = parseFloat(stock.cost_basis || 0);
+        stocksCostBasis += cost;
+        
+        // Convert to THB if needed
+        if (stock.currency !== 'THB') {
+          const rate = await getExchangeRate(stock.currency, 'THB');
+          cost *= rate;
+        }
+        stocksTotal += cost;
+      }
+    }
+
+    // Calculate liabilities with currency conversion
+    let liabilitiesTotal = 0;
+    if (liabilitiesData.data) {
+      for (const liability of liabilitiesData.data) {
+        let amount = parseFloat(liability.amount || 0);
+        if (liability.currency !== 'THB') {
+          const rate = await getExchangeRate(liability.currency, 'THB');
+          amount *= rate;
+        }
+        liabilitiesTotal += amount;
+      }
+    }
+
+    const totalWealth = cashTotal + cryptoTotal + stocksTotal;
 
     // Get yesterday's data
     const yesterday = new Date();
