@@ -38,19 +38,20 @@ export async function POST(request: NextRequest) {
     const cryptoTotal = cryptoData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
     const cryptoCostBasis = cryptoTotal;
 
+    // Calculate stocks total with currency conversion
     let stocksTotal = 0;
-    let stocksCostBasis = 0;
     if (stocksData.data) {
       for (const stock of stocksData.data) {
-        let cost = parseFloat(stock.cost_basis || 0);
-        stocksCostBasis += cost;
+        let value = parseFloat(stock.cost_basis || 0);
         
+        // cost_basis is stored in the stock's currency
         // Convert to THB if needed
-        if (stock.currency !== 'THB') {
-          const rate = await getExchangeRate(stock.currency, 'THB');
-          cost *= rate;
+        if (stock.currency === 'USD') {
+          const rate = await getExchangeRate('USD', 'THB');
+          value *= rate;
         }
-        stocksTotal += cost;
+        
+        stocksTotal += value;
       }
     }
 
@@ -98,8 +99,8 @@ export async function POST(request: NextRequest) {
         cash_diff: cashDiff,
         crypto_diff: cryptoDiff,
         stocks_diff: stocksDiff,
-        crypto_cost_basis: cryptoCostBasis,
-        stocks_cost_basis: stocksCostBasis
+        crypto_cost_basis: cryptoTotal,
+        stocks_cost_basis: stocksTotal
       }, {
         onConflict: 'date',
         ignoreDuplicates: false
