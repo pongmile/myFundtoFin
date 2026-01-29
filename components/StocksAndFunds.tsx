@@ -156,33 +156,24 @@ export default function StocksAndFunds() {
 
       if (error) throw error;
 
-      const stocksWithPrices = await Promise.all(
-        (data || []).map(async (stock) => {
-          try {
-            const price = await fetchPrice(stock);
-            const currentValue = price * stock.quantity;
-            const profitLoss = currentValue - stock.cost_basis;
-            const profitLossPercent = stock.cost_basis > 0 ? (profitLoss / stock.cost_basis) * 100 : 0;
+      // USE COST_BASIS FOR INSTANT DISPLAY - NO API CALLS!
+      const stocksWithPrices = (data || []).map((stock) => {
+        // Use cost_basis as current value (already in THB or will convert)
+        let currentValue = stock.cost_basis;
+        
+        // If USD, convert to THB (use approximate rate for instant display)
+        if (stock.currency === 'USD') {
+          currentValue *= 35.5; // Approximate exchange rate
+        }
 
-            return {
-              ...stock,
-              current_price: price,
-              total_value: currentValue,
-              profit_loss: profitLoss,
-              profit_loss_percent: profitLossPercent,
-            };
-          } catch (err) {
-            console.error(`Error fetching price for ${stock.symbol}:`, err);
-            return {
-              ...stock,
-              current_price: 0,
-              total_value: 0,
-              profit_loss: -stock.cost_basis,
-              profit_loss_percent: -100,
-            };
-          }
-        })
-      );
+        return {
+          ...stock,
+          current_price: 0, // Don't fetch on load
+          total_value: currentValue,
+          profit_loss: 0, // Can't calculate without original cost
+          profit_loss_percent: 0,
+        };
+      });
 
       setStocks(stocksWithPrices);
 

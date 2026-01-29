@@ -90,55 +90,30 @@ export default function Cryptocurrency() {
 
       if (error) throw error;
 
-      const assetsWithPrices = await Promise.all(
-        (data || []).map(async (asset) => {
-          try {
-            const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH', 'USDT' , 'ADA'].includes(asset.symbol.toUpperCase());
-            const apiUrl = useBitkub
-              ? `/api/crypto/bitkub?symbol=${asset.symbol}`
-              : `/api/crypto/price?symbol=${asset.symbol}`;
+      // USE COST_BASIS FOR INSTANT DISPLAY - NO API CALLS!
+      const assetsWithPrices = (data || []).map((asset) => {
+        const currentValue = asset.cost_basis; // Use stored value
+        const profitLoss = 0; // Can't calculate without original cost
+        const profitLossPercent = 0;
 
-            const response = await axios.get(apiUrl);
-            const currentPrice = response.data.priceThb || response.data.price || 0;
-            const change24h = response.data.change24h || 0;
-            const currentValue = currentPrice * asset.quantity;
-            const profitLoss = currentValue - asset.cost_basis;
-            const profitLossPercent = asset.cost_basis > 0 ? (profitLoss / asset.cost_basis) * 100 : 0;
-
-            return {
-              ...asset,
-              currentPrice,
-              currentValue,
-              profitLoss,
-              profitLossPercent,
-              change24h,
-            };
-          } catch (err) {
-            console.error(`Error fetching price for ${asset.symbol}:`, err);
-            return {
-              ...asset,
-              currentPrice: 0,
-              currentValue: 0,
-              profitLoss: -asset.cost_basis,
-              profitLossPercent: -100,
-              change24h: 0,
-            };
-          }
-        })
-      );
+        return {
+          ...asset,
+          currentPrice: 0, // Don't fetch price on load
+          currentValue: currentValue,
+          profitLoss: profitLoss,
+          profitLossPercent: profitLossPercent,
+          change24h: 0,
+        };
+      });
 
       setAssets(assetsWithPrices);
 
       const total = assetsWithPrices.reduce((sum, asset) => sum + asset.currentValue, 0);
       const cost = assetsWithPrices.reduce((sum, asset) => sum + asset.cost_basis, 0);
-      const weightedChange = assetsWithPrices.reduce((sum, asset) => {
-        const weight = asset.currentValue / total;
-        return sum + asset.change24h * weight;
-      }, 0);
 
       setTotalValue(total);
       setTotalCost(cost);
-      setTotalChange24h(weightedChange);
+      setTotalChange24h(0);
     } catch (error) {
       console.error('Error fetching assets:', error);
     } finally {
