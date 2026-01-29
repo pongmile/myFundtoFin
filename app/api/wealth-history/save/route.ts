@@ -44,18 +44,28 @@ export async function POST(request: NextRequest) {
     // Calculate stocks total with currency conversion
     let stocksTotal = 0;
     if (stocksData.data) {
+      console.log('[SAVE API] Processing stocks:', JSON.stringify(stocksData.data.map(s => ({
+        symbol: s.symbol,
+        cost_basis: s.cost_basis,
+        currency: s.currency
+      }))));
+      
       for (const stock of stocksData.data) {
         let value = parseFloat(stock.cost_basis || 0);
+        console.log(`[SAVE API] ${stock.symbol}: cost_basis=${stock.cost_basis} ${stock.currency}`);
         
         // cost_basis is stored in the stock's currency
         // Convert to THB if needed
         if (stock.currency === 'USD') {
           const rate = await getExchangeRate('USD', 'THB');
+          console.log(`[SAVE API] Converting USD to THB: ${value} * ${rate} = ${value * rate}`);
           value *= rate;
         }
         
+        console.log(`[SAVE API] Adding ${value} THB to stocksTotal`);
         stocksTotal += value;
       }
+      console.log(`[SAVE API] Final stocksTotal: ${stocksTotal}`);
     }
 
     // Calculate liabilities with currency conversion
