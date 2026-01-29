@@ -119,6 +119,23 @@ export default function Dashboard() {
         netWealth,
       });
 
+      // Auto-save to wealth history (send Dashboard's calculated values)
+      try {
+        await fetch('/api/wealth-history/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cash: cashTotal,
+            crypto: cryptoTotal,
+            stocks: stocksTotal,
+            liabilities: liabilitiesTotal,
+            totalWealth: totalWealth,
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to auto-save wealth history:', err);
+      }
+
       // Calculate changes
       if (historyData.data && historyData.data.length > 0) {
         const today = historyData.data[0];

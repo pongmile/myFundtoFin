@@ -9,79 +9,78 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // VERSION: v2-correct-usd-conversion
-    console.log('[SAVE API] Running version: v2-correct-usd-conversion');
+    // Accept values from Dashboard (already calculated correctly)
+    const body = await request.json().catch(() => null);
+    
+    let cashTotal, cryptoTotal, stocksTotal, liabilitiesTotal, totalWealth;
+    
+    if (body && body.cash !== undefined) {
+      // Values passed from Dashboard - use them directly!
+      cashTotal = parseFloat(body.cash);
+      cryptoTotal = parseFloat(body.crypto);
+      stocksTotal = parseFloat(body.stocks);
+      liabilitiesTotal = parseFloat(body.liabilities || 0);
+      totalWealth = parseFloat(body.totalWealth);
+    } else {
+      // Fallback: calculate ourselves (for cron jobs)
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
 
-    // Get today's date in YYYY-MM-DD format
+      // Fetch all current data
+      const [cashData, cryptoData, stocksData, liabilitiesData] = await Promise.all([
+        supabase.from('cash_accounts').select('*'),
+        supabase.from('crypto').select('*'),
+        supabase.from('stocks').select('*'),
+        supabase.from('liabilities').select('*'),
+      ]);
+
+      // Calculate cash total
+      cashTotal = 0;
+      if (cashData.data) {
+        for (const account of cashData.data) {
+          let amount = parseFloat(account.amount || 0);
+          if (account.currency !== 'THB') {
+            const rate = await getExchangeRate(account.currency, 'THB');
+            amount *= rate;
+          }
+          cashTotal += amount;
+        }
+      }
+
+      // Calculate crypto total
+      cryptoTotal = cryptoData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
+
+      // Calculate stocks total
+      stocksTotal = 0;
+      if (stocksData.data) {
+        for (const stock of stocksData.data) {
+          let value = parseFloat(stock.cost_basis || 0);
+          if (stock.currency === 'USD') {
+            const rate = await getExchangeRate('USD', 'THB');
+            value *= rate;
+          }
+          stocksTotal += value;
+        }
+      }
+
+      // Calculate liabilities
+      liabilitiesTotal = 0;
+      if (liabilitiesData.data) {
+        for (const liability of liabilitiesData.data) {
+          let amount = parseFloat(liability.amount || 0);
+          if (liability.currency !== 'THB') {
+            const rate = await getExchangeRate(liability.currency, 'THB');
+            amount *= rate;
+          }
+          liabilitiesTotal += amount;
+        }
+      }
+
+      totalWealth = cashTotal + cryptoTotal + stocksTotal;
+    }
+
+    // Get today's date
     const today = new Date().toISOString().split('T')[0];
-
-    // Fetch all current data
-    const [cashData, cryptoData, stocksData, liabilitiesData] = await Promise.all([
-      supabase.from('cash_accounts').select('*'),
-      supabase.from('crypto').select('*'),
-      supabase.from('stocks').select('*'),
-      supabase.from('liabilities').select('*'),
-    ]);
-
-    // Calculate cash total with currency conversion
-    let cashTotal = 0;
-    if (cashData.data) {
-      for (const account of cashData.data) {
-        let amount = parseFloat(account.amount || 0);
-        if (account.currency !== 'THB') {
-          const rate = await getExchangeRate(account.currency, 'THB');
-          amount *= rate;
-        }
-        cashTotal += amount;
-      }
-    }
-
-    // For crypto and stocks, use cost_basis (current stored value in THB)
-    // This should match what's shown in Dashboard
-    const cryptoTotal = cryptoData.data?.reduce((sum, item) => sum + parseFloat(item.cost_basis || 0), 0) || 0;
-    const cryptoCostBasis = cryptoTotal;
-
-    // Calculate stocks total with currency conversion
-    let stocksTotal = 0;
-    if (stocksData.data) {
-      console.log('[SAVE API] Processing stocks:', JSON.stringify(stocksData.data.map(s => ({
-        symbol: s.symbol,
-        cost_basis: s.cost_basis,
-        currency: s.currency
-      }))));
-      
-      for (const stock of stocksData.data) {
-        let value = parseFloat(stock.cost_basis || 0);
-        console.log(`[SAVE API] ${stock.symbol}: cost_basis=${stock.cost_basis} ${stock.currency}`);
-        
-        // cost_basis is stored in the stock's currency
-        // Convert to THB if needed
-        if (stock.currency === 'USD') {
-          const rate = await getExchangeRate('USD', 'THB');
-          console.log(`[SAVE API] Converting USD to THB: ${value} * ${rate} = ${value * rate}`);
-          value *= rate;
-        }
-        
-        console.log(`[SAVE API] Adding ${value} THB to stocksTotal`);
-        stocksTotal += value;
-      }
-      console.log(`[SAVE API] Final stocksTotal: ${stocksTotal}`);
-    }
-
-    // Calculate liabilities with currency conversion
-    let liabilitiesTotal = 0;
-    if (liabilitiesData.data) {
-      for (const liability of liabilitiesData.data) {
-        let amount = parseFloat(liability.amount || 0);
-        if (liability.currency !== 'THB') {
-          const rate = await getExchangeRate(liability.currency, 'THB');
-          amount *= rate;
-        }
-        liabilitiesTotal += amount;
-      }
-    }
-
-    const totalWealth = cashTotal + cryptoTotal + stocksTotal;
 
     // Get yesterday's data for calculating diffs
     const yesterday = new Date();
