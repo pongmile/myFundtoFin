@@ -90,35 +90,86 @@ export default function Cryptocurrency() {
 
       if (error) throw error;
 
-      // USE COST_BASIS FOR INSTANT DISPLAY - NO API CALLS!
-      const assetsWithPrices = (data || []).map((asset) => {
-        const currentValue = asset.cost_basis; // Use stored value
-        const profitLoss = 0; // Can't calculate without original cost
-        const profitLossPercent = 0;
+      // STEP 1: Load cached prices from price_cache for instant display
+      const symbols = (data || []).map(a => a.symbol);
+      const { data: cachedPrices } = await supabase
+        .from('price_cache')
+        .select('*')
+        .eq('asset_type', 'crypto')
+        .in('symbol', symbols);
+
+      const priceMap = new Map(cachedPrices?.map(p => [p.symbol, p.price]) || []);
+
+      const assetsWithCachedPrices = (data || []).map((asset) => {
+        const cachedPrice = priceMap.get(asset.symbol) || 0;
+        const currentValue = cachedPrice * asset.quantity;
+        const profitLoss = currentValue - asset.cost_basis;
+        const profitLossPercent = asset.cost_basis > 0 ? (profitLoss / asset.cost_basis) * 100 : 0;
 
         return {
           ...asset,
-          currentPrice: 0, // Don't fetch price on load
-          currentValue: currentValue,
+          currentPrice: cachedPrice,
+          currentValue: currentValue || asset.cost_basis, // Fallback to cost_basis
           profitLoss: profitLoss,
           profitLossPercent: profitLossPercent,
           change24h: 0,
         };
       });
 
-      setAssets(assetsWithPrices);
+      setAssets(assetsWithCachedPrices);
 
-      const total = assetsWithPrices.reduce((sum, asset) => sum + asset.currentValue, 0);
-      const cost = assetsWithPrices.reduce((sum, asset) => sum + asset.cost_basis, 0);
+      const total = assetsWithCachedPrices.reduce((sum, asset) => sum + asset.currentValue, 0);
+      const cost = assetsWithCachedPrices.reduce((sum, asset) => sum + asset.cost_basis, 0);
 
       setTotalValue(total);
       setTotalCost(cost);
       setTotalChange24h(0);
-    } catch (error) {
-      console.error('Error fetching assets:', error);
-    } finally {
       setLoading(false);
       setRefreshing(false);
+
+      // STEP 2: Background update with real-time API (don't await, don't block)
+      updatePricesInBackground(data);
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const updatePricesInBackground = async (assets: any[]) => {
+    // Update prices in background without blocking UI
+    for (const asset of assets) {
+      try {
+        const useBitkub = ['KUB', 'BTC', 'BNB', 'ETH', 'USDT', 'ADA'].includes(asset.symbol.toUpperCase());
+        const apiUrl = useBitkub
+          ? `/api/crypto/bitkub?symbol=${asset.symbol}`
+          : `/api/crypto/price?symbol=${asset.symbol}`;
+
+        const response = await axios.get(apiUrl);
+        const currentPrice = response.data.priceThb || response.data.price || 0;
+        const change24h = response.data.change24h || 0;
+
+        // Save to price_cache
+        await supabase.from('price_cache').upsert({
+          asset_type: 'crypto',
+          symbol: asset.symbol,
+          price: currentPrice,
+          currency: 'THB',
+        }, { onConflict: 'asset_type,symbol' });
+
+        // Update display
+        setAssets(prev => prev.map(a => {
+          if (a.symbol === asset.symbol) {
+            const currentValue = currentPrice * a.quantity;
+            const profitLoss = currentValue - a.cost_basis;
+            const profitLossPercent = a.cost_basis > 0 ? (profitLoss / a.cost_basis) * 100 : 0;
+            return { ...a, currentPrice, currentValue, profitLoss, profitLossPercent, change24h };
+          }
+          return a;
+        }));
+      } catch (err) {
+        console.error(`Background update failed for ${asset.symbol}:`, err);
+      }
     }
   };
 

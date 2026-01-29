@@ -156,37 +156,77 @@ export default function StocksAndFunds() {
 
       if (error) throw error;
 
-      // USE COST_BASIS FOR INSTANT DISPLAY - NO API CALLS!
-      const stocksWithPrices = (data || []).map((stock) => {
-        // Use cost_basis as current value (already in THB or will convert)
-        let currentValue = stock.cost_basis;
-        
-        // If USD, convert to THB (use approximate rate for instant display)
-        if (stock.currency === 'USD') {
-          currentValue *= 35.5; // Approximate exchange rate
-        }
+      // STEP 1: Load cached prices from price_cache for instant display
+      const symbols = (data || []).map(s => s.symbol);
+      const { data: cachedPrices } = await supabase
+        .from('price_cache')
+        .select('*')
+        .in('symbol', symbols);
+
+      const priceMap = new Map(cachedPrices?.map(p => [p.symbol, { price: p.price, currency: p.currency }]) || []);
+
+      const stocksWithCachedPrices = (data || []).map((stock) => {
+        const cached = priceMap.get(stock.symbol);
+        const cachedPrice = cached?.price || 0;
+        const currentValue = cachedPrice * stock.quantity;
+        const profitLoss = currentValue - stock.cost_basis;
+        const profitLossPercent = stock.cost_basis > 0 ? (profitLoss / stock.cost_basis) * 100 : 0;
 
         return {
           ...stock,
-          current_price: 0, // Don't fetch on load
-          total_value: currentValue,
-          profit_loss: 0, // Can't calculate without original cost
-          profit_loss_percent: 0,
+          current_price: cachedPrice,
+          total_value: currentValue || stock.cost_basis, // Fallback to cost_basis
+          profit_loss: profitLoss,
+          profit_loss_percent: profitLossPercent,
         };
       });
 
-      setStocks(stocksWithPrices);
+      setStocks(stocksWithCachedPrices);
 
-      const total = stocksWithPrices.reduce((sum, stock) => sum + (stock.total_value || 0), 0);
-      const cost = stocksWithPrices.reduce((sum, stock) => sum + stock.cost_basis, 0);
+      const total = stocksWithCachedPrices.reduce((sum, stock) => sum + (stock.total_value || 0), 0);
+      const cost = stocksWithCachedPrices.reduce((sum, stock) => sum + stock.cost_basis, 0);
 
       setTotalValue(total);
       setTotalCost(cost);
-    } catch (error) {
-      console.error('Error fetching stocks:', error);
-    } finally {
       setLoading(false);
       setRefreshing(false);
+
+      // STEP 2: Background update with real-time API (don't await, don't block)
+      updatePricesInBackground(data);
+    } catch (error) {
+      console.error('Error fetching stocks:', error);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const updatePricesInBackground = async (stocks: any[]) => {
+    // Update prices in background without blocking UI
+    for (const stock of stocks) {
+      try {
+        const price = await fetchPrice(stock);
+        
+        // Save to price_cache
+        await supabase.from('price_cache').upsert({
+          asset_type: stock.type,
+          symbol: stock.symbol,
+          price: price,
+          currency: stock.currency,
+        }, { onConflict: 'asset_type,symbol' });
+
+        // Update display
+        setStocks(prev => prev.map(s => {
+          if (s.symbol === stock.symbol) {
+            const currentValue = price * s.quantity;
+            const profitLoss = currentValue - s.cost_basis;
+            const profitLossPercent = s.cost_basis > 0 ? (profitLoss / s.cost_basis) * 100 : 0;
+            return { ...s, current_price: price, total_value: currentValue, profit_loss: profitLoss, profit_loss_percent: profitLossPercent };
+          }
+          return s;
+        }));
+      } catch (err) {
+        console.error(`Background update failed for ${stock.symbol}:`, err);
+      }
     }
   };
 
