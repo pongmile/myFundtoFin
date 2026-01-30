@@ -30,7 +30,7 @@ export async function GET(request: Request) {
             }
         }
         // Bitkub API endpoint
-        const response = await fetch('https://api.bitkub.com/api/market/ticker', {
+        const response = await fetch('https://api.bitkub.com/api/v3/market/ticker', {
             next: { revalidate: 60 }, // Cache for 60 seconds
         });
 
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
 // Background function to update cache
 async function updateCacheInBackground(symbol: string) {
     try {
-        const response = await fetch('https://api.bitkub.com/api/market/ticker');
+        const response = await fetch('https://api.bitkub.com/api/v3/market/ticker');
         if (response.ok) {
             const data = await response.json();
             const symbolMap: { [key: string]: string } = {
