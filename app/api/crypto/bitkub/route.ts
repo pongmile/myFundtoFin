@@ -29,7 +29,7 @@ export async function GET(request: Request) {
                 return cachedResponse;
             }
         }
-        // Bitkub API endpoint
+        // Bitkub API endpoint v3
         const response = await fetch('https://api.bitkub.com/api/v3/market/ticker', {
             next: { revalidate: 60 }, // Cache for 60 seconds
         });
@@ -40,19 +40,22 @@ export async function GET(request: Request) {
 
         const data = await response.json();
 
-        // Map symbols to Bitkub format
+        // Map symbols to Bitkub v3 format (BNB_THB, BTC_THB, etc.)
         const symbolMap: { [key: string]: string } = {
-            'BTC': 'THB_BTC',
-            'ETH': 'THB_ETH',
-            'BNB': 'THB_BNB',
-            'KUB': 'THB_KUB',
-            'USDT': 'THB_USDT',
-            'ADA': 'THB_ADA',
+            'BTC': 'BTC_THB',
+            'ETH': 'ETH_THB',
+            'BNB': 'BNB_THB',
+            'KUB': 'KUB_THB',
+            'USDT': 'USDT_THB',
+            'ADA': 'ADA_THB',
         };
 
         const bitkubSymbol = symbolMap[symbol.toUpperCase()];
 
-        if (!bitkubSymbol || !data[bitkubSymbol]) {
+        // v3 API returns an array, find the matching symbol
+        const ticker = data.find((item: any) => item.symbol === bitkubSymbol);
+
+        if (!ticker) {
             return NextResponse.json({
                 error: 'Symbol not found on Bitkub',
                 price: 0,
@@ -60,22 +63,20 @@ export async function GET(request: Request) {
             }, { status: 404 });
         }
 
-        const ticker = data[bitkubSymbol];
-
-        // Convert THB to USD (approximate rate: 1 USD = 31 THB)
-        const priceInUSD = ticker.last / 31;
-        const change24h = ticker.percentChange || 0;
+        // Parse v3 API response (snake_case fields)
+        const priceInUSD = parseFloat(ticker.last) / 31;
+        const change24h = parseFloat(ticker.percent_change) || 0;
 
         // Cache the price for future requests
-        await setCachedPrice('crypto', symbol, ticker.last, 'THB', 'bitkub');
+        await setCachedPrice('crypto', symbol, parseFloat(ticker.last), 'THB', 'bitkub');
 
         return NextResponse.json({
             price: priceInUSD,
-            priceThb: ticker.last,
+            priceThb: parseFloat(ticker.last),
             change24h: change24h,
-            high24h: ticker.high,
-            low24h: ticker.low,
-            volume24h: ticker.baseVolume,
+            high24h: parseFloat(ticker.high_24_hr),
+            low24h: parseFloat(ticker.low_24_hr),
+            volume24h: parseFloat(ticker.base_volume),
             source: 'bitkub',
             cached: false
         });
@@ -110,18 +111,18 @@ async function updateCacheInBackground(symbol: string) {
         if (response.ok) {
             const data = await response.json();
             const symbolMap: { [key: string]: string } = {
-                'BTC': 'THB_BTC',
-                'ETH': 'THB_ETH',
-                'BNB': 'THB_BNB',
-                'KUB': 'THB_KUB',
-                'USDT': 'THB_USDT',
-                'ADA': 'THB_ADA',
+                'BTC': 'BTC_THB',
+                'ETH': 'ETH_THB',
+                'BNB': 'BNB_THB',
+                'KUB': 'KUB_THB',
+                'USDT': 'USDT_THB',
+                'ADA': 'ADA_THB',
             };
             
             const bitkubSymbol = symbolMap[symbol.toUpperCase()];
-            if (bitkubSymbol && data[bitkubSymbol]) {
-                const ticker = data[bitkubSymbol];
-                await setCachedPrice('crypto', symbol, ticker.last, 'THB', 'bitkub');
+            const ticker = data.find((item: any) => item.symbol === bitkubSymbol);
+            if (ticker) {
+                await setCachedPrice('crypto', symbol, parseFloat(ticker.last), 'THB', 'bitkub');
             }
         }
     } catch (error) {

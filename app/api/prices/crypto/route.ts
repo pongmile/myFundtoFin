@@ -22,15 +22,16 @@ export async function GET(request: NextRequest) {
     let price: number | null = null;
     let source = '';
 
-    // Try Bitkub API first
-    if (['BTC', 'ETH', 'KUB', 'USDT', 'ADA', 'DOGE'].includes(symbol)) {
+    // Try Bitkub API v3 first
+    if (['BTC', 'ETH', 'BNB', 'KUB', 'USDT', 'ADA', 'DOGE'].includes(symbol)) {
       try {
         const response = await fetch('https://api.bitkub.com/api/v3/market/ticker');
         if (response.ok) {
           const data = await response.json();
-          const bitkubSymbol = `THB_${symbol}`;
-          if (data[bitkubSymbol]?.last) {
-            price = parseFloat(data[bitkubSymbol].last);
+          const bitkubSymbol = `${symbol}_THB`;
+          const ticker = data.find((item: any) => item.symbol === bitkubSymbol);
+          if (ticker?.last) {
+            price = parseFloat(ticker.last);
             source = 'bitkub';
           }
         }
