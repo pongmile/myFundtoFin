@@ -19,7 +19,7 @@ myFundtoFin/
 ├── 🧩 components/                   # React Components
 │   ├── Dashboard.tsx                # ✅ หน้าแรก - กราฟ Pie + Growth
 │   ├── WealthHistory.tsx            # ✅ ประวัติ Wealth
-│   ├── CashAccounts.tsx             # ✅ เงินสด - Multi-currency
+│   ├── CashAccounts.tsx             # ✅ Cash - Multi-currency
 │   ├── StocksAndFunds.tsx           # ✅ หุ้น/ETF/กองทุน
 │   ├── Cryptocurrency.tsx           # ✅ Crypto
 │   └── Liabilities.tsx              # ✅ หนี้สิน
@@ -46,8 +46,8 @@ myFundtoFin/
 
 ### 1️⃣ หน้า Dashboard (หน้าแรก)
 
-✅ **Pie Chart** แสดงการกระจายพอร์ต (เงินสด/Crypto/หุ้น)
-✅ **Total Wealth** รวมทรัพย์สินทั้งหมด
+✅ **Pie Chart** แสดงการกระจายพอร์ต (Cash/Crypto/หุ้น)
+✅ **Total Wealth** รวมTotal Wealth
 ✅ **การเปลี่ยนแปลง** รายวันและรายเดือน (เพิ่ม/ลด)
 ✅ **Growth Chart** แสดงการเติบโต 90 วันล่าสุด
 ✅ **Summary Cards** แยกแต่ละประเภท
@@ -56,14 +56,14 @@ myFundtoFin/
 ### 2️⃣ หน้า Wealth History (ประวัติ)
 
 ✅ ตารางแสดงประวัติย้อนหลัง
-✅ วันที่ | ทรัพย์สินทั้งหมด | เงินสด | Crypto | หุ้น
-✅ เงินสด เพิ่ม/ลด
+✅ วันที่ | Total Wealth | Cash | Crypto | หุ้น
+✅ Cash เพิ่ม/ลด
 ✅ Crypto เพิ่ม/ลด
 ✅ หุ้น เพิ่ม/ลด
 ✅ ต้นทุน Crypto
 ✅ ต้นทุน Stock
 
-### 3️⃣ หน้า Cash (เงินสด)
+### 3️⃣ หน้า Cash (Cash)
 
 ✅ แสดงแต่ละบัญชีธนาคาร
 ✅ Logo ธนาคาร (customizable)
@@ -139,7 +139,7 @@ myFundtoFin/
 
 ### Tables Created:
 
-1. ✅ **cash_accounts** - บัญชีเงินสด
+1. ✅ **cash_accounts** - บัญชีCash
 2. ✅ **stocks** - หุ้น/ETF/กองทุน
 3. ✅ **crypto** - Cryptocurrency
 4. ✅ **liabilities** - หนี้สิน
@@ -283,7 +283,7 @@ vercel               # Deploy to Vercel
 
 ตามรูปภาพที่ให้มา คุณสามารถเพิ่ม:
 
-**เงินสด:**
+**Cash:**
 - SCB ลงทุน: ฿10,000
 - SCB ออม: ฿1,005,000
 - SCB เงินเดือน: ฿10,000

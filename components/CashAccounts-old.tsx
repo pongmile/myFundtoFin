@@ -127,7 +127,7 @@ export default function CashAccounts() {
             <Wallet className="w-7 h-7 text-white" strokeWidth={2.5} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">เงินสด</h1>
+            <h1 className="text-3xl font-bold text-white">Cash</h1>
             <p className="text-gray-400 text-sm">Cash & Bank Accounts</p>
           </div>
         </div>
@@ -277,7 +277,7 @@ export default function CashAccounts() {
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-gray-400 text-sm mb-2">มูลค่าเงินสดทั้งหมด</p>
+                  <p className="text-gray-400 text-sm mb-2">มูลค่าCashทั้งหมด</p>
                   <h2 className="text-4xl font-bold text-white mb-1">
                     ฿{totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </h2>

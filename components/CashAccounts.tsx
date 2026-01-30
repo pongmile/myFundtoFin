@@ -201,7 +201,7 @@ export default function CashAccounts() {
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Box>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  💵 เงินสดทั้งหมด
+                  💵 Cashทั้งหมด
                 </Typography>
                 <Typography variant="h4" fontWeight="bold">
                   {formatCurrency(totalValue)}
@@ -281,7 +281,7 @@ export default function CashAccounts() {
         ) : (
           <Alert severity="info">
             <Typography variant="body1" fontWeight="bold">
-              ยังไม่มีบัญชีเงินสด
+              ยังไม่มีบัญชีCash
             </Typography>
             <Typography variant="body2">
               กดปุ่ม + ด้านล่างเพื่อเพิ่มบัญชีแรก
@@ -303,7 +303,7 @@ export default function CashAccounts() {
       <Dialog open={showDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <form onSubmit={handleSave}>
           <DialogTitle>
-            {editingId ? '✏️ แก้ไขบัญชี' : '➕ เพิ่มบัญชีเงินสด'}
+            {editingId ? '✏️ แก้ไขบัญชี' : '➕ เพิ่มบัญชีCash'}
           </DialogTitle>
           <DialogContent>
             <Stack spacing={3} mt={1}>

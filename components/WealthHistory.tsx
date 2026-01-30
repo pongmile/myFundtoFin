@@ -64,25 +64,25 @@ export default function WealthHistory() {
                   วันที่
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ทรัพย์สินทั้งหมด
+                  Total Wealth
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  เงินสด
+                  Cash
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Crypto
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  หุ้น & กองทุน
+                  Stock&Fund
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  เงินสด เพิ่ม/ลด
+                  Cash +/-
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Crypto เพิ่ม/ลด
+                  Crypto +/-
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  หุ้น เพิ่ม/ลด
+                  Stock&Fund +/-
                 </th>
               </tr>
             </thead>

@@ -164,14 +164,14 @@ After deployment, add environment variables:
 
 ### Adding Cash Accounts
 
-1. Go to **เงินสด (Cash)** page
+1. Go to **Cash (Cash)** page
 2. Click **เพิ่มบัญชี (Add Account)**
 3. Enter bank name, amount, and currency
 4. Click **บันทึก (Save)**
 
 ### Adding Stocks/ETFs/Funds
 
-1. Go to **หุ้น & กองทุน (Stocks & Funds)** page
+1. Go to **Stock&Fund (Stocks & Funds)** page
 2. Click **เพิ่มรายการ (Add Item)**
 3. Fill in:
    - **Symbol**: Stock ticker (e.g., AAPL, MSFT)

@@ -208,7 +208,7 @@ export default function DashboardMobile() {
   }, []);
 
   const pieData = [
-    { name: 'เงินสด', value: summary.cash, color: '#10B981' },
+    { name: 'Cash', value: summary.cash, color: '#10B981' },
     { name: 'หุ้น/กองทุน', value: summary.stocks, color: '#8B5CF6' },
     { name: 'Crypto', value: summary.crypto, color: '#F59E0B' },
   ].filter(item => item.value > 0);
@@ -295,7 +295,7 @@ export default function DashboardMobile() {
           🏠 ทั้งหมด
         </button>
         <button className="px-6 py-3 bg-gray-800/60 text-gray-300 rounded-full text-sm font-semibold whitespace-nowrap border border-gray-600 hover:bg-gray-700/60 transition-all">
-          💵 เงินสด
+          💵 Cash
         </button>
         <button className="px-6 py-3 bg-gray-800/60 text-gray-300 rounded-full text-sm font-semibold whitespace-nowrap border border-gray-600 hover:bg-gray-700/60 transition-all">
           📊 กองทุน
@@ -373,7 +373,7 @@ export default function DashboardMobile() {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📊</div>
             <p className="text-gray-300 text-lg font-semibold mb-2">ยังไม่มีข้อมูลสินทรัพย์</p>
-            <p className="text-gray-500 text-sm">เพิ่มบัญชีเงินสด หุ้น หรือ Crypto เพื่อเริ่มต้น</p>
+            <p className="text-gray-500 text-sm">เพิ่มบัญชีCash หุ้น หรือ Crypto เพื่อเริ่มต้น</p>
           </div>
         )}
       </div>
@@ -397,7 +397,7 @@ export default function DashboardMobile() {
               <Wallet size={28} className="text-green-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-lg mb-1">💵 เงินสด</h3>
+              <h3 className="text-white font-bold text-lg mb-1">💵 Cash</h3>
               <p className="text-gray-400 text-sm">{summary.cashCount} บัญชี</p>
             </div>
             <div className="text-right">
@@ -416,7 +416,7 @@ export default function DashboardMobile() {
               <TrendingUp size={28} className="text-purple-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-white font-bold text-lg mb-1">📈 หุ้น & กองทุน</h3>
+              <h3 className="text-white font-bold text-lg mb-1">📈 Stock&Fund</h3>
               <p className="text-gray-400 text-sm">{summary.stockCount} รายการ</p>
             </div>
             <div className="text-right">

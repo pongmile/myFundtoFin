@@ -234,7 +234,7 @@ export default function StocksAndFunds() {
                         <TrendingUp className="w-7 h-7 text-white" strokeWidth={2.5} />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-white">หุ้น & กองทุน</h1>
+                        <h1 className="text-3xl font-bold text-white">Stock&Fund</h1>
                         <p className="text-gray-400 text-sm">Stocks & Funds</p>
                     </div>
                 </div>

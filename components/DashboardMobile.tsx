@@ -242,7 +242,7 @@ export default function DashboardMobile() {
   }, []);
 
   const pieData = [
-    { name: 'เงินสด', value: summary.cash, color: COLORS[0] },
+    { name: 'Cash', value: summary.cash, color: COLORS[0] },
     { name: 'หุ้น/กองทุน', value: summary.stocks, color: COLORS[1] },
     { name: 'Crypto', value: summary.crypto, color: COLORS[2] },
   ].filter(item => item.value > 0);
@@ -358,7 +358,7 @@ export default function DashboardMobile() {
                 ยังไม่มีข้อมูลสินทรัพย์
               </Typography>
               <Typography variant="body2" color="text.disabled">
-                เพิ่มบัญชีเงินสด หุ้น หรือ Crypto เพื่อเริ่มต้น
+                เพิ่มบัญชีCash หุ้น หรือ Crypto เพื่อเริ่มต้น
               </Typography>
             </Box>
           )}
@@ -375,7 +375,7 @@ export default function DashboardMobile() {
               </Avatar>
               <Box flex={1}>
                 <Typography variant="h6" fontWeight="bold">
-                  💵 เงินสด
+                  💵 Cash
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {summary.cashCount} บัญชี
@@ -401,7 +401,7 @@ export default function DashboardMobile() {
               </Avatar>
               <Box flex={1}>
                 <Typography variant="h6" fontWeight="bold">
-                  📈 หุ้น & กองทุน
+                  📈 Stock&Fund
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {summary.stockCount} รายการ

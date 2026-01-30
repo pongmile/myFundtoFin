@@ -22,7 +22,7 @@ myFundtoFin/
 ├── 🧩 components/                             # React Components
 │   ├── Dashboard.tsx                          # หน้าแรก - Charts & Summary
 │   ├── WealthHistory.tsx                      # ประวัติ Wealth
-│   ├── CashAccounts.tsx                       # เงินสด
+│   ├── CashAccounts.tsx                       # Cash
 │   ├── StocksAndFunds.tsx                     # หุ้น/ETF/กองทุน
 │   ├── Cryptocurrency.tsx                     # Crypto
 │   └── Liabilities.tsx                        # หนี้สิน

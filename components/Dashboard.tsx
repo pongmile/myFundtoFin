@@ -175,9 +175,9 @@ export default function Dashboard() {
   }, []);
 
   const pieData = [
-    { name: 'เงินสด', value: summary.cash, color: '#5B8FF9' },
+    { name: 'Cash', value: summary.cash, color: '#5B8FF9' },
     { name: 'Crypto', value: summary.crypto, color: '#F6BD16' },
-    { name: 'หุ้น & กองทุน', value: summary.stocks, color: '#E86452' },
+    { name: 'Stock&Fund', value: summary.stocks, color: '#E86452' },
   ];
 
   const formatCurrency = (value: number) => {
@@ -280,7 +280,7 @@ export default function Dashboard() {
         </div>
 
         <div className="glass-card p-6 shadow-xl hover:shadow-2xl transition-all hover:scale-105 border-gray-700/50">
-          <p className="text-gray-400 text-sm font-medium">เงินสด</p>
+          <p className="text-gray-400 text-sm font-medium">Cash</p>
           <p className="text-3xl font-bold text-blue-400 mt-2">{formatCurrency(summary.cash)}</p>
           <p className="text-sm text-gray-500 mt-2">
             {((summary.cash / summary.totalWealth) * 100).toFixed(1)}% ของพอร์ต
@@ -296,7 +296,7 @@ export default function Dashboard() {
         </div>
 
         <div className="glass-card p-6 shadow-xl hover:shadow-2xl transition-all hover:scale-105 border-gray-700/50">
-          <p className="text-gray-400 text-sm font-medium">หุ้น & กองทุน</p>
+          <p className="text-gray-400 text-sm font-medium">Stock&Fund</p>
           <p className="text-3xl font-bold text-purple-400 mt-2">{formatCurrency(summary.stocks)}</p>
           <p className="text-sm text-gray-500 mt-2">
             {((summary.stocks / summary.totalWealth) * 100).toFixed(1)}% ของพอร์ต

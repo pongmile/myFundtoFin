@@ -31,7 +31,7 @@ export default function Home() {
   const tabs = [
     { id: 'dashboard' as TabType, icon: DashboardIcon, label: 'หน้าหลัก' },
     { id: 'history' as TabType, icon: HistoryIcon, label: 'ลงทุน' },
-    { id: 'cash' as TabType, icon: AccountBalanceWallet, label: 'เงินสด' },
+    { id: 'cash' as TabType, icon: AccountBalanceWallet, label: 'Cash' },
     { id: 'stocks' as TabType, icon: TrendingUp, label: 'สินทรัพย์' },
     { id: 'crypto' as TabType, icon: CurrencyBitcoin, label: 'Crypto' },
     { id: 'liabilities' as TabType, icon: CreditCard, label: 'หนี้' },

@@ -358,7 +358,7 @@ export default function StocksAndFunds() {
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
               <Box>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  📈 หุ้น & กองทุนทั้งหมด
+                  📈 Stock&Fundทั้งหมด
                 </Typography>
                 <Typography variant="h4" fontWeight="bold">
                   {formatCurrency(totalValue)}
